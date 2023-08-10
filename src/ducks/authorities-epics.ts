@@ -92,7 +92,7 @@ const getAuthorityProviderAttributesDescriptors: AppEpic = (action$, state, deps
             deps.apiClients.connectors
                 .getAttributes({
                     uuid: action.payload.uuid,
-                    functionGroup: FunctionGroupCode.AuthorityProvider,
+                    functionGroup: action.payload.isLegacy ? FunctionGroupCode.LegacyAuthorityProvider : FunctionGroupCode.AuthorityProvider,
                     kind: action.payload.kind,
                 })
                 .pipe(

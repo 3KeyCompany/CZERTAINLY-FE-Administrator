@@ -99,7 +99,7 @@ export const slice = createSlice({
             state.isFetchingAuthorityProviders = false;
         },
 
-        getAuthorityProviderAttributesDescriptors: (state, action: PayloadAction<{ uuid: string; kind: string }>) => {
+        getAuthorityProviderAttributesDescriptors: (state, action: PayloadAction<{ uuid: string; isLegacy: boolean; kind: string }>) => {
             state.authorityProviderAttributeDescriptors = [];
             state.isFetchingAuthorityProviderAttributeDescriptors = true;
         },

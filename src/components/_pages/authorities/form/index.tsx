@@ -107,6 +107,7 @@ export default function AuthorityForm() {
                 dispatch(
                     authorityActions.getAuthorityProviderAttributesDescriptors({
                         uuid: authoritySelector!.connectorUuid,
+                        isLegacy: provider.functionGroups.some(fg => fg.functionGroupCode === FunctionGroupCode.LegacyAuthorityProvider),
                         kind: authoritySelector!.kind,
                     }),
                 );
@@ -149,7 +150,7 @@ export default function AuthorityForm() {
 
             dispatch(connectorActions.clearCallbackData());
             setGroupAttributesCallbackAttributes([]);
-            dispatch(authorityActions.getAuthorityProviderAttributesDescriptors({ uuid: authorityProvider.uuid, kind: event.value }));
+            dispatch(authorityActions.getAuthorityProviderAttributesDescriptors({ uuid: authorityProvider.uuid, isLegacy: authorityProvider.functionGroups.some(fg => fg.functionGroupCode === FunctionGroupCode.LegacyAuthorityProvider), kind: event.value }));
         },
         [dispatch, authorityProvider],
     );
