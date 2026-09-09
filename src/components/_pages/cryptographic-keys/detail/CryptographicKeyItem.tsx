@@ -34,11 +34,19 @@ type Props = Readonly<{
     keyUuid: string;
     tokenInstanceUuid?: string;
     tokenProfileUuid?: string;
+    supportedKeyUsages?: KeyUsage[];
     keyItem: CryptographicKeyItemDetailResponseModel;
     totalKeyItems: number;
 }>;
 
-export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, tokenProfileUuid, keyItem, totalKeyItems }: Props) {
+export default function CryptographicKeyItem({
+    keyUuid,
+    tokenInstanceUuid,
+    tokenProfileUuid,
+    supportedKeyUsages,
+    keyItem,
+    totalKeyItems,
+}: Props) {
     const dispatch = useDispatch();
 
     const isUpdatingKeyItem = useSelector(selectors.isUpdatingKeyItem);
@@ -110,7 +118,7 @@ export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, token
     }, [dispatch, keyItem, keyUuid]);
 
     const onUpdateKeyUsageConfirmed = useCallback(() => {
-        if (!keyItem) return;
+        if (!keyItem || !supportedKeyUsages) return;
         dispatch(
             actions.updateKeyUsage({
                 uuid: keyUuid,
@@ -118,7 +126,7 @@ export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, token
             }),
         );
         setKeyUsageUpdate(false);
-    }, [dispatch, keyUsages, keyItem, keyUuid]);
+    }, [dispatch, keyUsages, keyItem, keyUuid, supportedKeyUsages]);
 
     const onDeleteConfirmed = useCallback(() => {
         if (!keyItem) return;
@@ -206,7 +214,7 @@ export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, token
             {
                 id: 'key',
                 icon: 'key',
-                disabled: false,
+                disabled: !supportedKeyUsages,
                 tooltip: 'Update Key Usage',
                 onClick: () => {
                     setKeyUsageUpdate(true);
@@ -263,6 +271,7 @@ export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, token
             keyItem.state,
             keyItem.usage,
             tokenInstanceUuid,
+            supportedKeyUsages,
         ],
     );
 
@@ -614,12 +623,21 @@ export default function CryptographicKeyItem({ keyUuid, tokenInstanceUuid, token
             <Dialog
                 isOpen={keyUsageUpdate}
                 caption="Update Key Usage"
-                body={<KeyUsageSelect value={keyUsages} onChange={setKeyUsages} keyUsageEnum={keyUsageEnum} keyType={keyItem.type} />}
+                body={
+                    <KeyUsageSelect
+                        value={keyUsages}
+                        onChange={setKeyUsages}
+                        keyUsageEnum={keyUsageEnum}
+                        keyType={keyItem.type}
+                        supportedKeyUsages={supportedKeyUsages ?? []}
+                        isDisabled={!supportedKeyUsages}
+                    />
+                }
                 toggle={() => setKeyUsageUpdate(false)}
                 size="md"
                 buttons={[
                     { color: 'secondary', variant: 'outline', onClick: () => setKeyUsageUpdate(false), body: 'Cancel' },
-                    { color: 'primary', onClick: onUpdateKeyUsageConfirmed, body: 'Update' },
+                    { color: 'primary', onClick: onUpdateKeyUsageConfirmed, body: 'Update', disabled: !supportedKeyUsages },
                 ]}
             />
         </div>
