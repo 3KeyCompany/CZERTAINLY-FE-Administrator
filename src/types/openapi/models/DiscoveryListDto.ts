@@ -46,13 +46,13 @@ export interface DiscoveryListDto {
      * @type {string}
      * @memberof DiscoveryListDto
      */
-    startTime?: string;
+    startTime?: string | null;
     /**
      * Date and time when Discovery finished
      * @type {string}
      * @memberof DiscoveryListDto
      */
-    endTime?: string;
+    endTime?: string | null;
     /**
      * Number of certificates that are discovered
      * @type {number}
@@ -72,7 +72,7 @@ export interface DiscoveryListDto {
      */
     connectorName: string;
     /**
-     * Values of the attribute-sourced fields requested as columns, keyed by field source and then by field identifier. Present only when the listing request asked for attribute-sourced columns; a field the object has no value for is absent rather than empty.
+     * Values of the attribute-sourced fields requested as columns, keyed by field source and then by field identifier. Present only when the listing request asked for attribute-sourced columns; a field the object has no value for is absent rather than empty, and a multi-valued attribute arrives in its stored item_order.
      * @type {{ [key: string]: { [key: string]: Array<BaseAttributeContentDtoV3>; }; }}
      * @memberof DiscoveryListDto
      */
