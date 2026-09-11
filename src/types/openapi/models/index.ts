@@ -1,6 +1,7 @@
 export * from './AccountStatus';
 export * from './AcmeAccountListResponseDto';
 export * from './AcmeAccountResponseDto';
+export * from './AcmeEabKeyDto';
 export * from './AcmeProfileDto';
 export * from './AcmeProfileEditRequestDto';
 export * from './AcmeProfileListDto';
