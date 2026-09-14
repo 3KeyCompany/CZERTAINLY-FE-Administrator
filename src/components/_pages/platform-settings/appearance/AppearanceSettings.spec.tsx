@@ -71,18 +71,30 @@ test.describe('AppearanceSettings', () => {
 
             await expect(row).toBeVisible();
             await expect(row).toContainText(label);
-            await expect(page.getByTestId(`label-tooltip-${key}`)).toBeVisible();
+            await expect(page.getByTestId(`color-help-${key}`)).toBeVisible();
         }
     });
 
-    test('should say what a colour drives and which theme it reaches on hover', async ({ mount, page }) => {
+    /**
+     * Behind a toggletip rather than a hover tooltip: the description is the only place saying which theme a colour
+     * reaches, so it has to be reachable without a pointer.
+     */
+    test('should say what a colour drives and which theme it reaches', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
-        await page.getByTestId('label-tooltip-primaryColor').hover();
+        await page.getByTestId('color-help-primaryColor').click();
 
-        await expect(page.getByRole('tooltip')).toContainText(
+        await expect(page.getByTestId('color-help-primaryColor-content')).toContainText(
             'Buttons, links, active states and the page header. Applies to both the light and the dark theme.',
         );
+    });
+
+    test('should keep focus on the field a colour was cleared from', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
+
+        await page.getByTestId('color-clear-primaryColor').click();
+
+        await expect(page.getByTestId('color-hex-primaryColor')).toBeFocused();
     });
 
     test('should not offer a tertiary colour', async ({ mount, page }) => {

@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import Button from 'components/Button';
 import Label from 'components/Label';
+import Toggletip from 'components/Toggletip';
 import TextInput from 'components/TextInput';
 import { BRAND_COLOR_MESSAGE, isBrandColor } from 'utils/branding';
 
@@ -29,11 +30,21 @@ function ColorField({ id, label, description, value, onChange, disabled = false 
     const valid = value === '' || isBrandColor(value);
     const errorId = `${id}-error`;
 
+    // Clearing removes the button that was just activated, so focus would fall to the document body and a keyboard
+    // operator would tab in from the top of the page again. It moves to the field the button emptied.
+    const onClear = () => {
+        onChange('');
+        document.getElementById(id)?.focus();
+    };
+
     return (
         <div className="flex flex-col gap-1" data-testid={`color-field-${id}`}>
-            <Label htmlFor={id} labelTooltip={description} className="mb-0">
-                {label}
-            </Label>
+            <div className="flex items-center gap-1.5">
+                <Label htmlFor={id} className="mb-0">
+                    {label}
+                </Label>
+                <Toggletip ariaLabel={`${label} color`} content={description} dataTestId={`color-help-${id}`} />
+            </div>
             <div className="flex items-stretch gap-3">
                 <div className="grow">
                     <TextInput
@@ -63,7 +74,7 @@ function ColorField({ id, label, description, value, onChange, disabled = false 
                         variant="outline"
                         color="secondary"
                         disabled={disabled}
-                        onClick={() => onChange('')}
+                        onClick={onClear}
                         aria-label={`Clear ${label}`}
                         data-testid={`color-clear-${id}`}
                     >

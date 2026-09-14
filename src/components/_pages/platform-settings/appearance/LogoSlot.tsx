@@ -15,7 +15,6 @@ type Props = {
     onSelect: (file: File) => void;
     onDelete: () => void;
     disabled?: boolean;
-    required?: boolean;
 };
 
 /**
@@ -25,7 +24,7 @@ type Props = {
  * The preview doubles as the drop zone and the file picker's trigger, so it is a `button` rather than a `div`: a
  * drop target is invisible to anyone not using a mouse, and the same box then stays reachable by keyboard.
  */
-function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disabled = false, required = false }: Readonly<Props>) {
+function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disabled = false }: Readonly<Props>) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
     const errorId = `${id}-error`;
@@ -71,7 +70,7 @@ function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disab
 
     return (
         <div className="flex flex-col gap-2" data-testid={`logo-slot-${id}`}>
-            <Label htmlFor={id} required={required} className="mb-0">
+            <Label htmlFor={id} className="mb-0">
                 {label}
             </Label>
 
@@ -92,6 +91,7 @@ function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disab
                         !isDraggingOver && !disabled && 'hover:border-brand',
                         value && !isDraggingOver && 'border-solid border-divider bg-surface-raised',
                     )}
+                    id={`${id}-dropzone`}
                     data-testid={`logo-choose-${id}`}
                 >
                     {value ? (
@@ -114,7 +114,10 @@ function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disab
                         variant="outline"
                         color="danger"
                         disabled={disabled}
-                        onClick={onDelete}
+                        onClick={() => {
+                            onDelete();
+                            document.getElementById(`${id}-dropzone`)?.focus();
+                        }}
                         aria-label={`Delete ${label} logo`}
                         data-testid={`logo-delete-${id}`}
                     >

@@ -1,8 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
     BRAND_COLOR_PATTERN,
+    BRANDING_CACHE_MAX_AGE_MS,
     dataUriMediaType,
     isBrandColor,
+    markBrandingChanged,
+    shouldBypassBrandingCache,
     isRenderableLogo,
     LOGO_MAX_DECODED_BYTES,
     logoMediaTypeFromName,
@@ -314,6 +317,74 @@ describe('branding', () => {
 
             expect(result.error).toBeUndefined();
             expect(result.dataUri).toMatch(/^data:image\/svg\+xml;base64,/);
+
+            vi.unstubAllGlobals();
+        });
+    });
+
+    describe('branding cache window', () => {
+        const KEY = 'branding-changed-at';
+
+        const withStorage = (store: Map<string, string>) => {
+            vi.stubGlobal('localStorage', {
+                getItem: (k: string) => store.get(k) ?? null,
+                setItem: (k: string, v: string) => void store.set(k, v),
+                removeItem: (k: string) => void store.delete(k),
+            });
+            return store;
+        };
+
+        test('should not bypass the cache when this browser has changed nothing', () => {
+            withStorage(new Map());
+
+            expect(shouldBypassBrandingCache()).toBe(false);
+
+            vi.unstubAllGlobals();
+        });
+
+        test('should bypass the cache for a change inside the window', () => {
+            const store = withStorage(new Map());
+            markBrandingChanged(1_000_000);
+
+            expect(store.get(KEY)).toBe('1000000');
+            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_MAX_AGE_MS)).toBe(true);
+
+            vi.unstubAllGlobals();
+        });
+
+        /** The mark is dropped once it expires, so a browser that never changes branding again stops paying for it. */
+        test('should stop bypassing, and forget the mark, once the window has passed', () => {
+            const store = withStorage(new Map());
+            markBrandingChanged(1_000_000);
+
+            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_MAX_AGE_MS + 1)).toBe(false);
+            expect(store.has(KEY)).toBe(false);
+
+            vi.unstubAllGlobals();
+        });
+
+        test('should ignore a stored value that is not a number', () => {
+            withStorage(new Map([[KEY, 'not-a-timestamp']]));
+
+            expect(shouldBypassBrandingCache()).toBe(false);
+
+            vi.unstubAllGlobals();
+        });
+
+        /** Private browsing and an exceeded quota both throw; the cache window is an optimisation, never a hard need. */
+        test('should treat unavailable storage as no reason to bypass', () => {
+            vi.stubGlobal('localStorage', {
+                getItem: () => {
+                    throw new Error('denied');
+                },
+                setItem: () => {
+                    throw new Error('denied');
+                },
+                removeItem: () => {},
+            });
+
+            expect(() => markBrandingChanged()).not.toThrow();
+            expect(shouldBypassBrandingCache()).toBe(false);
 
             vi.unstubAllGlobals();
         });

@@ -1,10 +1,11 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { firstValueFrom, lastValueFrom, type Observable, of, throwError } from 'rxjs';
 import { AjaxError } from 'rxjs/ajax';
 import { delay, take, toArray } from 'rxjs/operators';
 import type { PublicBrandingModel } from 'types/branding';
 import { actions as alertActions } from './alerts';
 import { actions as appRedirectActions } from './app-redirect';
+import * as brandingUtils from 'utils/branding';
 import { platformDefaultBranding, slice, toPublicBranding } from './branding';
 import epics from './branding-epics';
 
@@ -205,7 +206,24 @@ describe('branding epics', () => {
             slice.actions.updateBrandingFailure({ error: 'Branding was saved but could not be read back. unreadable' }),
             appRedirectActions.fetchError({ error: err, message: 'Branding was saved but could not be read back' }),
             slice.actions.getBranding(),
+            slice.actions.getPublicBranding(),
         ]);
+    });
+
+    /**
+     * The brand changed on the server even though the read-back failed, so the applied palette is stale too. Without
+     * the mark the reload that follows is answered from the browser's cache with the brand that was just replaced.
+     */
+    test('updateBranding marks the cache window even when the read-back fails', async () => {
+        const marked: number[] = [];
+        vi.spyOn(brandingUtils, 'markBrandingChanged').mockImplementation(() => void marked.push(1));
+        const deps = createDeps({ getBrandingSettings: () => throwError(() => new Error('unreadable')) });
+
+        await runAll(epics[WRITE_BRANDING], slice.actions.updateBranding({ branding: {} }), deps);
+
+        expect(marked).toHaveLength(1);
+
+        vi.restoreAllMocks();
     });
 
     /** Reset is one empty update rather than a field-by-field clear, so the body sent has to actually be empty. */

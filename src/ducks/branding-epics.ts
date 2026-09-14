@@ -60,20 +60,22 @@ const runUpdate = (deps: EpicDependencies, branding: BrandingSettingsUpdateModel
     deps.apiClients.settings.updateBrandingSettings({ brandingSettingsUpdateDto: branding }).pipe(
         // The write answers 204 and Core rewrites SVG logos before storing them, so the stored branding is read back
         // instead of echoing the request, which would leave the store holding markup Core deliberately removed.
-        mergeMap(() =>
-            deps.apiClients.settings.getBrandingSettings().pipe(
+        mergeMap(() => {
+            // Marked as soon as the write lands, not after the read-back: the brand has changed on the server either
+            // way, so a read-back failure must not leave the next load reading the replaced brand from the cache.
+            markBrandingChanged();
+
+            return deps.apiClients.settings.getBrandingSettings().pipe(
                 // Derived from the read-back rather than re-read: the anonymous response is the one the token layer
                 // resolves from, and re-reading it here would be answered from the browser cache with the pre-write
                 // brand. See `markBrandingChanged`.
-                mergeMap((stored) => {
-                    markBrandingChanged();
-
-                    return of(
+                mergeMap((stored) =>
+                    of(
                         slice.actions.updateBrandingSuccess({ branding: stored }),
                         slice.actions.getPublicBrandingSuccess({ branding: toPublicBranding(stored) }),
                         alertActions.success('Branding updated successfully.'),
-                    );
-                }),
+                    ),
+                ),
                 // Reporting this as a failed save would invite a retry that changes nothing, because the write landed.
                 // The slice is what is wrong — it still holds the pre-write branding — so a fresh read repairs it.
                 catchError((err) =>
@@ -81,10 +83,13 @@ const runUpdate = (deps: EpicDependencies, branding: BrandingSettingsUpdateModel
                         slice.actions.updateBrandingFailure({ error: extractError(err, READ_BACK_FAILED) }),
                         appRedirectActions.fetchError({ error: err, message: READ_BACK_FAILED }),
                         slice.actions.getBranding(),
+                        // The write landed, so the applied palette is stale too - and the mark above lets this read
+                        // past the browser cache that would otherwise answer it with the replaced brand.
+                        slice.actions.getPublicBranding(),
                     ),
                 ),
-            ),
-        ),
+            );
+        }),
         catchError((err) =>
             of(
                 slice.actions.updateBrandingFailure({ error: extractError(err, 'Failed to update branding') }),
