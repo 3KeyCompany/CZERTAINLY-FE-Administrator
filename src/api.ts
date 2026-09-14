@@ -21,6 +21,7 @@ import {
     ConnectorManagementApi,
     ConnectorManagementV2Api,
     CredentialManagementApi,
+    CryptographicAssetInventoryApi,
     CryptographicKeyManagementApi,
     CryptographicOperationsControllerApi,
     CustomAttributesApi,
@@ -121,6 +122,7 @@ export interface ApiClients {
     info: InfoApi;
     tokenInstances: TokenInstanceManagementApi;
     tokenProfiles: TokenProfileManagementApi;
+    cryptographicAssets: CryptographicAssetInventoryApi;
     cryptographicKeys: CryptographicKeyManagementApi;
     cryptographicOperations: CryptographicOperationsControllerApi;
     trustedCertificates: TrustedCertificateManagementApi;
@@ -190,6 +192,7 @@ const factories: Partial<{ [K in ApiClientKey]: () => ApiClients[K] }> = {
     info: () => new InfoApi(configuration),
     tokenInstances: () => new TokenInstanceManagementApi(configuration),
     tokenProfiles: () => new TokenProfileManagementApi(configuration),
+    cryptographicAssets: () => new CryptographicAssetInventoryApi(configuration),
     cryptographicKeys: () => new CryptographicKeyManagementApi(configuration),
     cryptographicOperations: () => new CryptographicOperationsControllerApi(configuration),
     oids: () => new CustomOIDManagementApi(configuration),
