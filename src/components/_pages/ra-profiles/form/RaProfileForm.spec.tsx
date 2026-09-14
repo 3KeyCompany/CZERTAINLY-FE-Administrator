@@ -63,6 +63,36 @@ async function authorAttribute(page: Page, name: string, label: string): Promise
     await expect(page.getByTestId('request-attribute-authoring-attribute-row')).toHaveCount(1);
 }
 
+const PATCH_ACTION = 'raProfileRequestAttributes/updateRaProfileRequestAttributes';
+
+async function authorMergeWithBinding(page: Page, attributeName: string): Promise<void> {
+    await page.getByRole('tab', { name: 'Request Attributes' }).click();
+    await page.getByTestId('request-attribute-authoring-merge-merge').click();
+    await page.getByTestId('request-attribute-authoring-binding-add').click();
+    await page.locator('#ra-binding-name').click();
+    await page.locator('#ra-binding-name').fill(attributeName);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('request-attribute-authoring-binding-row')).toHaveCount(1);
+}
+
+/** Submits the form, stands in for the create epic's success and returns the follow-up request-attributes PATCH. */
+async function createAndAwaitPatch(page: Page): Promise<CapturedAction | undefined> {
+    await page.getByTestId('progress-button').click();
+
+    const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
+    expect(create?.payload?.deferRedirect).toBe(true);
+
+    // Flipping isCreating true -> false fires the component's finish-hook, which dispatches the
+    // request-attributes PATCH using the returned UUID.
+    await dispatchToStore(page, {
+        type: 'raprofiles/createRaProfileSuccess',
+        payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
+    });
+    await expect.poll(async () => (await capturedActions(page)).some((a) => a.type === PATCH_ACTION)).toBe(true);
+
+    return (await capturedActions(page)).find((a) => a.type === PATCH_ACTION);
+}
+
 test.describe('RaProfileForm (create mode) request-attributes chain', () => {
     test('renders the request-attributes editor in create mode with a pre-selected authority', async ({ mount, page }) => {
         const component = await mount(<RaProfileFormCreateWithStore />);
@@ -91,31 +121,9 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         await mount(<RaProfileFormCreateWithStore />);
 
         await fillName(page, 'ProfileWithBinding');
-        await page.getByRole('tab', { name: 'Request Attributes' }).click();
-        await page.getByTestId('request-attribute-authoring-merge-merge').click();
-        await page.getByTestId('request-attribute-authoring-binding-add').click();
-        await page.locator('#ra-binding-name').click();
-        await page.locator('#ra-binding-name').fill('datacenter');
-        await page.getByRole('button', { name: 'Save' }).click();
-        await expect(page.getByTestId('request-attribute-authoring-binding-row')).toHaveCount(1);
+        await authorMergeWithBinding(page, 'datacenter');
 
-        await page.getByTestId('progress-button').click();
-
-        const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
-        expect(create?.payload?.deferRedirect).toBe(true);
-
-        await dispatchToStore(page, {
-            type: 'raprofiles/createRaProfileSuccess',
-            payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
-        });
-
-        await expect
-            .poll(async () =>
-                (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes'),
-            )
-            .toBeTruthy();
-
-        const patch = (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes');
+        const patch = await createAndAwaitPatch(page);
         expect(patch?.payload?.data).toMatchObject({
             mergeMode: 'merge',
             valueSourceBindings: [{ attributeName: 'datacenter', valueSourceType: 'none' }],
@@ -142,7 +150,7 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         expect(create).toBeTruthy();
         expect(create?.payload?.deferRedirect).toBe(false);
         // No authored attributes → the chain must not fire the request-attributes PATCH.
-        expect(actions.some((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes')).toBe(false);
+        expect(actions.some((a) => a.type === PATCH_ACTION)).toBe(false);
     });
 
     test('authored attributes: create defers redirect and chains the request-attributes PATCH', async ({ mount, page }) => {
@@ -151,25 +159,7 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         await fillName(page, 'ProfileWithAttrs');
         await authorAttribute(page, 'serverFqdn', 'Server FQDN');
 
-        await page.getByTestId('progress-button').click();
-
-        const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
-        expect(create?.payload?.deferRedirect).toBe(true);
-
-        // Stand in for the create epic's success: this flips isCreating true -> false, which fires the
-        // component's finish-hook that dispatches the request-attributes PATCH using the returned UUID.
-        await dispatchToStore(page, {
-            type: 'raprofiles/createRaProfileSuccess',
-            payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
-        });
-
-        await expect
-            .poll(async () =>
-                (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes'),
-            )
-            .toBeTruthy();
-
-        const patch = (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes');
+        const patch = await createAndAwaitPatch(page);
         expect(patch?.payload?.raProfileUuid).toBe('created-uuid');
         expect(patch?.payload?.authorityUuid).toBe('auth-1');
     });
@@ -198,29 +188,10 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         await template.click();
         await template.fill('Roman');
 
-        await page.getByRole('tab', { name: 'Request Attributes' }).click();
-        await page.getByTestId('request-attribute-authoring-merge-merge').click();
-        await page.getByTestId('request-attribute-authoring-binding-add').click();
-        await page.locator('#ra-binding-name').click();
-        await page.locator('#ra-binding-name').fill('info_raProfileGuidance');
-        await page.getByRole('button', { name: 'Save' }).click();
-        await expect(page.getByTestId('request-attribute-authoring-binding-row')).toHaveCount(1);
+        await authorMergeWithBinding(page, 'info_raProfileGuidance');
 
         await expect(page.getByTestId('progress-button')).toBeEnabled();
-        await page.getByTestId('progress-button').click();
-
-        const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
-        expect(create?.payload?.deferRedirect).toBe(true);
-
-        await dispatchToStore(page, {
-            type: 'raprofiles/createRaProfileSuccess',
-            payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
-        });
-        await expect
-            .poll(async () =>
-                (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes'),
-            )
-            .toBeTruthy();
+        await createAndAwaitPatch(page);
 
         // Core rejecting the set must not strand the modal: the chain redirects on the PATCH's own finish.
         await dispatchToStore(page, {
@@ -245,8 +216,6 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
 
         await expect(page.getByTestId('progress-button')).toBeEnabled();
         // Failed create → the request-attributes PATCH must never have fired.
-        expect((await capturedActions(page)).some((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes')).toBe(
-            false,
-        );
+        expect((await capturedActions(page)).some((a) => a.type === PATCH_ACTION)).toBe(false);
     });
 });

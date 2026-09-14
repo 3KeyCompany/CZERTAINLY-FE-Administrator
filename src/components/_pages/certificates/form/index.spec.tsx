@@ -392,9 +392,10 @@ test.describe('CertificateForm', () => {
         await page.getByTestId('select-raProfile-trigger').click();
         await page.getByRole('option', { name: 'RA Two' }).click();
 
-        await expect
-            .poll(() => dispatched.filter((a) => a.type === 'certificates/getCsrAttributes').map((a) => a.payload.raProfileUuid))
-            .toEqual(['ra-1', 'ra-2']);
+        const requestedProfiles = () =>
+            dispatched.filter((a) => a.type === 'certificates/getCsrAttributes').map((a) => a.payload.raProfileUuid);
+        await expect.poll(() => requestedProfiles().length).toBe(2);
+        expect(requestedProfiles()).toEqual(['ra-1', 'ra-2']);
     });
 
     test('registerCertificate payload omits authorizationSecret when the Challenge is left empty', async ({ mount, page }) => {

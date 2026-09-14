@@ -61,8 +61,11 @@ export default function RaProfileRequestAttributesWidget({
     );
     const [dirty, setDirty] = useState(false);
 
+    // The descriptors live in a shared slice, so drop the previous authority's set before fetching:
+    // otherwise the binding picker offers the old connector's fields until the new response lands.
     useEffect(() => {
         if (authorityUuid) {
+            dispatch(authoritiesActions.clearRAProfilesAttributesDescriptors());
             dispatch(authoritiesActions.getRAProfilesAttributesDescriptors({ authorityUuid }));
         }
     }, [dispatch, authorityUuid]);

@@ -148,6 +148,21 @@ test.describe('RaProfileRequestAttributesWidget', () => {
         expect(patch.payload).toMatchObject({ data: { mergeMode: 'merge', valueSourceBindings: [] } });
     });
 
+    test('clears the previous connector descriptors before fetching the current authority set', async ({ mount, page }) => {
+        await mount(<RaProfileRequestAttributesWidgetTestWrapper />);
+
+        await expect(page.getByTestId('ra-profile-request-attributes-widget')).toBeVisible();
+        const types = await page.evaluate(() =>
+            ((globalThis as unknown as { __raProfileWidgetActions__: CapturedAction[] }).__raProfileWidgetActions__ ?? []).map(
+                (a) => a.type,
+            ),
+        );
+        const clearIndex = types.indexOf('authorities/clearRAProfilesAttributesDescriptors');
+        const fetchIndex = types.indexOf('authorities/getRAProfilesAttributesDescriptors');
+        expect(clearIndex).toBeGreaterThanOrEqual(0);
+        expect(fetchIndex).toBeGreaterThan(clearIndex);
+    });
+
     test('renders no widget-level Save button', async ({ mount, page }) => {
         await mount(<RaProfileRequestAttributesWidgetTestWrapper />);
         await expect(page.getByTestId('ra-profile-request-attributes-widget')).toBeVisible();
