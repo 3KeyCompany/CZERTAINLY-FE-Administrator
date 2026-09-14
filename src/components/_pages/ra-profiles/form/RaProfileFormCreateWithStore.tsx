@@ -4,19 +4,22 @@ import { MemoryRouter } from 'react-router';
 import { testInitialState, testReducers } from 'ducks/test-reducers';
 import RaProfileForm from './index';
 
-// Mounts RaProfileForm in *create* mode with a browser-side store instrumented for CT:
+// Mounts RaProfileForm in *create* mode (or *edit* mode when `raProfileId` is given, with the profile
+// preloaded in `raprofiles.raProfile`) with a browser-side store instrumented for CT:
 //  - a capturing middleware records every dispatched action on window.__raProfileActions__ so the
 //    test can assert the create→PATCH chain (deferRedirect flag, the follow-up PATCH payload);
 //  - the store itself is exposed on window.__raProfileStore__ so the test can stand in for the
 //    (epic-less) create outcome by dispatching createRaProfileSuccess / createRaProfileFailure.
-// The authority is pre-selected via the `authorityId` prop, so the test needs neither the authorities
-// slice (absent from the CT reducers) nor any Select interaction to enable the request-attributes tab.
-// Pass authorityId="" to exercise the no-authority state where the attribute tabs are disabled.
+// The authority is pre-selected via the `authorityId` prop, so no Select interaction is needed to
+// enable the request-attributes tab. Pass authorityId="" to exercise the no-authority state where the
+// attribute tabs are disabled.
 export default function RaProfileFormCreateWithStore({
     authorityId = 'auth-1',
+    raProfileId,
     preloadedState,
 }: {
     authorityId?: string;
+    raProfileId?: string;
     preloadedState?: Partial<ReturnType<typeof testReducers>>;
 }) {
     const capturedActions: UnknownAction[] = [];
@@ -36,7 +39,7 @@ export default function RaProfileFormCreateWithStore({
     return (
         <Provider store={store}>
             <MemoryRouter initialEntries={['/raprofiles/add']}>
-                <RaProfileForm authorityId={authorityId} />
+                <RaProfileForm raProfileId={raProfileId} authorityId={authorityId} />
             </MemoryRouter>
         </Provider>
     );

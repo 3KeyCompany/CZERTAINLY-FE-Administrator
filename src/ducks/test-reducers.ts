@@ -828,6 +828,9 @@ function raProfileRequestAttributesTestReducer(
     if (failure.type === 'raProfileRequestAttributes/updatePlatformDefaultRequestAttributesFailure') {
         return { ...current, isUpdatingDefaultSet: false, updateDefaultSetSucceeded: false, updateDefaultSetError: failure.payload?.error };
     }
+    if (action.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributesSuccess') {
+        return { ...current, isUpdatingRaProfileSet: false, updateRaProfileSetSucceeded: true };
+    }
     if (failure.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributesFailure') {
         return {
             ...current,
@@ -845,6 +848,7 @@ export type RaProfilesTestState = {
     createRaProfileSucceeded: boolean;
     createdRaProfileUuid: string | null;
     raProfiles: any[];
+    raProfile?: any;
 };
 
 const raProfilesTestInitialState: RaProfilesTestState = {
@@ -873,6 +877,8 @@ function raProfilesTestReducer(state: RaProfilesTestState | undefined, action: U
             };
         case 'raprofiles/createRaProfileFailure':
             return { ...current, isCreating: false, createRaProfileSucceeded: false, createdRaProfileUuid: null };
+        case 'raprofiles/updateRaProfile':
+            return { ...current, isUpdating: true };
         default:
             return current;
     }

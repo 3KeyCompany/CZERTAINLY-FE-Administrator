@@ -102,6 +102,8 @@ export default function RaProfileForm({
     const [localProfileModifications, setLocalProfileModifications] = useState<Partial<RaProfileResponseModel>>({});
 
     const isUpdatingRequestAttributes = useSelector(requestAttributesSelectors.isUpdatingRaProfileSet);
+    const updateRequestAttributesSucceeded = useSelector(requestAttributesSelectors.updateRaProfileSetSucceeded);
+    const pendingEditUpdateRef = useRef<ReturnType<typeof raProfilesActions.updateRaProfile> | undefined>(undefined);
     const [requestAttributesForm, setRequestAttributesForm] = useState<RequestAttributeAuthoringFormValues>(emptyAuthoringForm());
     const [requestAttributesDirty, setRequestAttributesDirty] = useState(false);
     const createdRaProfileUuid = useSelector(raProfilesSelectors.createdRaProfileUuid);
@@ -262,13 +264,26 @@ export default function RaProfileForm({
 
     useRunOnFinish(isUpdatingRequestAttributes, redirectAfterCreateRequestAttributes);
 
+    // A rejected PATCH keeps the modal open with the edits, so the PUT only follows a saved set.
+    const dispatchPendingEditUpdate = useCallback(() => {
+        const updateProfile = pendingEditUpdateRef.current;
+        if (!updateProfile) return;
+        pendingEditUpdateRef.current = undefined;
+        if (updateRequestAttributesSucceeded) {
+            dispatch(updateProfile);
+        }
+    }, [dispatch, updateRequestAttributesSucceeded]);
+
+    useRunOnFinish(isUpdatingRequestAttributes, dispatchPendingEditUpdate);
+
     // The create → request-attributes PATCH → redirect chain runs here in the component. Report the
     // in-flight window up so the host (the create modal) can block dismissal until it settles —
     // unmounting mid-chain would drop the PATCH dispatch, creating the profile without its attributes.
-    const createInFlight = useMemo(
-        () => !editMode && (isCreating || pendingCreateAttributes || isUpdatingRequestAttributes),
-        [editMode, isCreating, pendingCreateAttributes, isUpdatingRequestAttributes],
-    );
+    // An edit chains the other way (PATCH → PUT), and unmounting mid-PATCH would drop the PUT.
+    const createInFlight = useMemo(() => {
+        if (editMode) return isUpdatingRequestAttributes || isUpdating;
+        return isCreating || pendingCreateAttributes || isUpdatingRequestAttributes;
+    }, [editMode, isCreating, isUpdating, pendingCreateAttributes, isUpdatingRequestAttributes]);
 
     useEffect(() => {
         onInFlightChange?.(createInFlight);
@@ -311,35 +326,35 @@ export default function RaProfileForm({
         (values: FormValues) => {
             if (editMode) {
                 if (!id) return;
-                if (requestAttributesDirty && requestAttributesSeeded) {
-                    const authorityUuid = raProfile?.authorityInstanceUuid || authorityId;
-                    if (authorityUuid) {
-                        dispatch(
-                            requestAttributesActions.updateRaProfileRequestAttributes({
-                                authorityUuid,
-                                raProfileUuid: id,
-                                data: buildRaProfileRequestAttributesUpdateDto(requestAttributesForm),
-                            }),
-                        );
-                    }
+                const updateProfile = raProfilesActions.updateRaProfile({
+                    profileUuid: id,
+                    authorityInstanceUuid: values.authority,
+                    redirect: `../../../raprofiles/detail/${values.authority}/${id}`,
+                    raProfileEditRequest: {
+                        enabled: raProfile!.enabled,
+                        description: values.description,
+                        attributes: collectFormAttributes(
+                            'ra-profile',
+                            [...(raProfileAttributeDescriptors ?? []), ...groupAttributesCallbackAttributes],
+                            values,
+                        ),
+                        customAttributes: collectFormAttributes('customRaProfile', resourceCustomAttributes, values),
+                    },
+                });
+                const authorityUuid = raProfile?.authorityInstanceUuid || authorityId;
+                if (requestAttributesDirty && requestAttributesSeeded && authorityUuid) {
+                    // The PUT waits for the PATCH: the detail page refetches on PUT success and must read the saved set.
+                    pendingEditUpdateRef.current = updateProfile;
+                    dispatch(
+                        requestAttributesActions.updateRaProfileRequestAttributes({
+                            authorityUuid,
+                            raProfileUuid: id,
+                            data: buildRaProfileRequestAttributesUpdateDto(requestAttributesForm),
+                        }),
+                    );
+                } else {
+                    dispatch(updateProfile);
                 }
-                dispatch(
-                    raProfilesActions.updateRaProfile({
-                        profileUuid: id,
-                        authorityInstanceUuid: values.authority,
-                        redirect: `../../../raprofiles/detail/${values.authority}/${id}`,
-                        raProfileEditRequest: {
-                            enabled: raProfile!.enabled,
-                            description: values.description,
-                            attributes: collectFormAttributes(
-                                'ra-profile',
-                                [...(raProfileAttributeDescriptors ?? []), ...groupAttributesCallbackAttributes],
-                                values,
-                            ),
-                            customAttributes: collectFormAttributes('customRaProfile', resourceCustomAttributes, values),
-                        },
-                    }),
-                );
             } else {
                 const withRequestAttributes = hasAuthoredRequestAttributes(requestAttributesForm);
                 pendingCreateAuthorityRef.current = values.authority;

@@ -219,3 +219,69 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         expect((await capturedActions(page)).some((a) => a.type === PATCH_ACTION)).toBe(false);
     });
 });
+
+const UPDATE_PROFILE_ACTION = 'raprofiles/updateRaProfile';
+
+const editModeState = {
+    authorities: { ...testInitialState.authorities, authorities: [{ uuid: 'auth-1', name: 'Authority One' }] },
+    raprofiles: {
+        ...testInitialState.raprofiles,
+        raProfile: {
+            uuid: 'profile-1',
+            name: 'BoundProfile',
+            description: '',
+            enabled: true,
+            authorityInstanceUuid: 'auth-1',
+            attributes: [],
+            customAttributes: [],
+            certificateRequestAttributes: {
+                requestAttributes: [],
+                mergeMode: 'merge',
+                valueSourceBindings: [{ attributeName: 'datacenter', valueSourceType: 'none' }],
+            },
+        },
+    },
+};
+
+async function changeMergeModeAndSave(page: Page): Promise<void> {
+    await page.getByRole('tab', { name: 'Request Attributes' }).click();
+    await page.getByTestId('request-attribute-authoring-merge-staticOnly').click();
+    await expect(page.getByTestId('progress-button')).toBeEnabled();
+    await page.getByTestId('progress-button').click();
+    await expect.poll(async () => (await capturedActions(page)).some((a) => a.type === PATCH_ACTION)).toBe(true);
+}
+
+test.describe('RaProfileForm (edit mode) save chain', () => {
+    test('saves the request attributes first and the profile only after Core accepts them', async ({ mount, page }) => {
+        await mount(<RaProfileFormCreateWithStore raProfileId="profile-1" preloadedState={editModeState} />);
+
+        await changeMergeModeAndSave(page);
+
+        const patch = (await capturedActions(page)).find((a) => a.type === PATCH_ACTION);
+        expect(patch?.payload?.raProfileUuid).toBe('profile-1');
+        expect(patch?.payload?.data).toMatchObject({
+            mergeMode: 'staticOnly',
+            valueSourceBindings: [{ attributeName: 'datacenter', valueSourceType: 'none' }],
+        });
+        expect((await capturedActions(page)).some((a) => a.type === UPDATE_PROFILE_ACTION)).toBe(false);
+
+        await dispatchToStore(page, { type: 'raProfileRequestAttributes/updateRaProfileRequestAttributesSuccess', payload: {} });
+
+        await expect.poll(async () => (await capturedActions(page)).some((a) => a.type === UPDATE_PROFILE_ACTION)).toBe(true);
+        const update = (await capturedActions(page)).find((a) => a.type === UPDATE_PROFILE_ACTION);
+        expect(update?.payload?.profileUuid).toBe('profile-1');
+    });
+
+    test('a rejected PATCH withholds the profile save and leaves the form open for a retry', async ({ mount, page }) => {
+        await mount(<RaProfileFormCreateWithStore raProfileId="profile-1" preloadedState={editModeState} />);
+
+        await changeMergeModeAndSave(page);
+        await dispatchToStore(page, {
+            type: 'raProfileRequestAttributes/updateRaProfileRequestAttributesFailure',
+            payload: { error: 'rejected by core' },
+        });
+
+        await expect(page.getByTestId('progress-button')).toBeEnabled();
+        expect((await capturedActions(page)).some((a) => a.type === UPDATE_PROFILE_ACTION)).toBe(false);
+    });
+});
