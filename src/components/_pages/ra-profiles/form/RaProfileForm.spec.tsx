@@ -1,5 +1,6 @@
 import { test, expect } from '../../../../../playwright/ct-test';
 import type { Page } from '@playwright/test';
+import { testInitialState } from 'ducks/test-reducers';
 import RaProfileFormCreateWithStore from './RaProfileFormCreateWithStore';
 
 // End-to-end-ish coverage of the create-mode orchestration: authoring request attributes while
@@ -7,6 +8,25 @@ import RaProfileFormCreateWithStore from './RaProfileFormCreateWithStore';
 // the component. The store is instrumented in RaProfileFormCreateWithStore — captured actions assert
 // what was dispatched, and window.__raProfileStore__ lets the test stand in for the (epic-less) create
 // outcome. The authority is pre-selected via the form's `authorityId` prop.
+
+// An authority connector's own RA-profile attributes: a read-only info box plus a required field.
+const connectorDescriptors = [
+    {
+        uuid: 'info-uuid',
+        name: 'info_raProfileGuidance',
+        type: 'info',
+        contentType: 'text',
+        content: [{ data: 'Choosing a certificate template' }],
+        properties: { label: 'Template guidance', visible: true, required: false, readOnly: true, list: false, multiSelect: false },
+    },
+    {
+        uuid: 'template-uuid',
+        name: 'raprofile_template_name',
+        type: 'data',
+        contentType: 'string',
+        properties: { label: 'Certificate template', visible: true, required: true, readOnly: false, list: false, multiSelect: false },
+    },
+];
 
 type CapturedAction = { type: string; payload?: Record<string, unknown> };
 
@@ -55,15 +75,51 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         await expect(component.getByTestId('request-attribute-authoring-attribute-add')).toBeEnabled();
     });
 
-    test('hides the merge-mode selector and value-source bindings section', async ({ mount, page }) => {
+    test('shows the merge-mode selector, defaulting to Static only, and the value-source bindings section', async ({ mount, page }) => {
         const component = await mount(<RaProfileFormCreateWithStore />);
 
         await page.getByRole('tab', { name: 'Request Attributes' }).click();
 
-        // Editor is mounted (authority pre-selected) — so an absent section is a genuine hide, not an unmounted editor.
         await expect(component.getByTestId('request-attribute-authoring-attributes-empty')).toBeVisible();
-        await expect(page.getByTestId('request-attribute-authoring-merge-mode')).toHaveCount(0);
-        await expect(page.getByTestId('request-attribute-authoring-bindings')).toHaveCount(0);
+        const mergeMode = page.getByTestId('request-attribute-authoring-merge-mode');
+        await expect(mergeMode).toBeVisible();
+        await expect(mergeMode.getByRole('radio', { name: /Static only/ })).toBeChecked();
+        await expect(page.getByTestId('request-attribute-authoring-bindings-empty')).toBeVisible();
+    });
+
+    test('a chosen merge mode and value-source binding count as authored and ride the follow-up PATCH', async ({ mount, page }) => {
+        await mount(<RaProfileFormCreateWithStore />);
+
+        await fillName(page, 'ProfileWithBinding');
+        await page.getByRole('tab', { name: 'Request Attributes' }).click();
+        await page.getByTestId('request-attribute-authoring-merge-merge').click();
+        await page.getByTestId('request-attribute-authoring-binding-add').click();
+        await page.locator('#ra-binding-name').click();
+        await page.locator('#ra-binding-name').fill('datacenter');
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByTestId('request-attribute-authoring-binding-row')).toHaveCount(1);
+
+        await page.getByTestId('progress-button').click();
+
+        const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
+        expect(create?.payload?.deferRedirect).toBe(true);
+
+        await dispatchToStore(page, {
+            type: 'raprofiles/createRaProfileSuccess',
+            payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
+        });
+
+        await expect
+            .poll(async () =>
+                (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes'),
+            )
+            .toBeTruthy();
+
+        const patch = (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes');
+        expect(patch?.payload?.data).toMatchObject({
+            mergeMode: 'merge',
+            valueSourceBindings: [{ attributeName: 'datacenter', valueSourceType: 'none' }],
+        });
     });
 
     test('attribute tabs are disabled until an authority is selected', async ({ mount, page }) => {
@@ -116,6 +172,62 @@ test.describe('RaProfileForm (create mode) request-attributes chain', () => {
         const patch = (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes');
         expect(patch?.payload?.raProfileUuid).toBe('created-uuid');
         expect(patch?.payload?.authorityUuid).toBe('auth-1');
+    });
+
+    // A connector that supplies its own RA-profile attributes (an info guidance box plus a required
+    // field) is the shape the create modal actually runs in. Covers the whole chain in that shape:
+    // authoring only a merge mode and a binding must still submit, and a rejected follow-up PATCH must
+    // still release the modal rather than leave it open with the profile already created.
+    test('with connector attributes present, a merge-mode-only set still creates and settles on a rejected PATCH', async ({
+        mount,
+        page,
+    }) => {
+        await mount(
+            <RaProfileFormCreateWithStore
+                preloadedState={{
+                    authorities: { ...testInitialState.authorities, raProfileAttributeDescriptors: connectorDescriptors } as never,
+                }}
+            />,
+        );
+
+        await fillName(page, 'ProfileWithConnectorAttrs');
+
+        await page.getByRole('tab', { name: 'Connector Attributes' }).click();
+        const template = page.getByTestId('text-input-__attributes__ra-profile__.raprofile_template_name');
+        await expect(template).toBeVisible({ timeout: 15000 });
+        await template.click();
+        await template.fill('Roman');
+
+        await page.getByRole('tab', { name: 'Request Attributes' }).click();
+        await page.getByTestId('request-attribute-authoring-merge-merge').click();
+        await page.getByTestId('request-attribute-authoring-binding-add').click();
+        await page.locator('#ra-binding-name').click();
+        await page.locator('#ra-binding-name').fill('info_raProfileGuidance');
+        await page.getByRole('button', { name: 'Save' }).click();
+        await expect(page.getByTestId('request-attribute-authoring-binding-row')).toHaveCount(1);
+
+        await expect(page.getByTestId('progress-button')).toBeEnabled();
+        await page.getByTestId('progress-button').click();
+
+        const create = (await capturedActions(page)).find((a) => a.type === 'raprofiles/createRaProfile');
+        expect(create?.payload?.deferRedirect).toBe(true);
+
+        await dispatchToStore(page, {
+            type: 'raprofiles/createRaProfileSuccess',
+            payload: { uuid: 'created-uuid', authorityInstanceUuid: 'auth-1' },
+        });
+        await expect
+            .poll(async () =>
+                (await capturedActions(page)).find((a) => a.type === 'raProfileRequestAttributes/updateRaProfileRequestAttributes'),
+            )
+            .toBeTruthy();
+
+        // Core rejecting the set must not strand the modal: the chain redirects on the PATCH's own finish.
+        await dispatchToStore(page, {
+            type: 'raProfileRequestAttributes/updateRaProfileRequestAttributesFailure',
+            payload: { error: 'rejected by core' },
+        });
+        await expect.poll(async () => (await capturedActions(page)).some((a) => a.type === 'appRedirect/redirect')).toBe(true);
     });
 
     test('create failure releases the lock so the user can retry from the open form', async ({ mount, page }) => {

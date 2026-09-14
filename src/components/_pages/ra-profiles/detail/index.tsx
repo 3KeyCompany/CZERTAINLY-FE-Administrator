@@ -1045,7 +1045,6 @@ export default function RaProfileDetail() {
                                                         authorityUuid={requestAttributesAuthorityUuid}
                                                         raProfileUuid={raProfile.uuid}
                                                         certificateRequestAttributes={raProfile.certificateRequestAttributes}
-                                                        onSaved={getFreshRaProfileDetail}
                                                     />
                                                 </Widget>
                                             )}

@@ -6,6 +6,7 @@ import type { CertificateRequestAttributesSettingsDto, PlatformSettingsUpdateDto
 import { extractError } from 'utils/net';
 import { actions as alertActions } from './alerts';
 import { actions as appRedirectActions } from './app-redirect';
+import { actions as raProfilesActions } from './ra-profiles';
 import { slice } from './raProfileRequestAttributes';
 
 export const updateRaProfileRequestAttributes: AppEpic = (action$, state$, deps) => {
@@ -22,6 +23,10 @@ export const updateRaProfileRequestAttributes: AppEpic = (action$, state$, deps)
                     switchMap((raProfileDto) =>
                         of(
                             slice.actions.updateRaProfileRequestAttributesSuccess({ set: raProfileDto.certificateRequestAttributes }),
+                            raProfilesActions.raProfileRequestAttributesUpdated({
+                                uuid: action.payload.raProfileUuid,
+                                certificateRequestAttributes: raProfileDto.certificateRequestAttributes,
+                            }),
                             alertActions.success('Request attributes updated successfully.'),
                         ),
                     ),

@@ -12,7 +12,13 @@ import RaProfileForm from './index';
 // The authority is pre-selected via the `authorityId` prop, so the test needs neither the authorities
 // slice (absent from the CT reducers) nor any Select interaction to enable the request-attributes tab.
 // Pass authorityId="" to exercise the no-authority state where the attribute tabs are disabled.
-export default function RaProfileFormCreateWithStore({ authorityId = 'auth-1' }: { authorityId?: string }) {
+export default function RaProfileFormCreateWithStore({
+    authorityId = 'auth-1',
+    preloadedState,
+}: {
+    authorityId?: string;
+    preloadedState?: Partial<ReturnType<typeof testReducers>>;
+}) {
     const capturedActions: UnknownAction[] = [];
     (globalThis as unknown as { __raProfileActions__: UnknownAction[] }).__raProfileActions__ = capturedActions;
 
@@ -23,7 +29,7 @@ export default function RaProfileFormCreateWithStore({ authorityId = 'auth-1' }:
     const store = configureStore({
         reducer: testReducers,
         middleware: (getDefaultMiddleware) => getDefaultMiddleware({ serializableCheck: false }).concat(captureMiddleware),
-        preloadedState: testInitialState,
+        preloadedState: { ...testInitialState, ...preloadedState },
     });
     (globalThis as unknown as { __raProfileStore__: typeof store }).__raProfileStore__ = store;
 
