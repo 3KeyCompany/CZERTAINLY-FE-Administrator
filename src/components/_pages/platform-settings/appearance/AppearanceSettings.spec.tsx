@@ -30,8 +30,7 @@ const storedBranding = (branding: Record<string, string>) => ({
 const unbranded = storedBranding({});
 
 /**
- * A brand with every field filled. Most of these tests need one now: branding saves whole, so a form missing any
- * colour or either logo offers no Save to click.
+ * A brand with every field filled, so a test that edits one field starts from a state where the others are set.
  *
  * The colours are the platform's own, which matters beyond realism: they clear WCAG AA everywhere, so a Save here goes
  * straight through rather than stopping at the contrast warning. The tests that want that warning choose colours that
@@ -59,21 +58,31 @@ const setHex = async (page: Page, key: string, value: string) => {
 const chooseFile = (input: Locator, name: string, mimeType: string, buffer: Buffer) => input.setInputFiles({ name, mimeType, buffer });
 
 test.describe('AppearanceSettings', () => {
-    test('should render each colour row with what it drives and which theme it reaches', async ({ mount, page }) => {
+    test('should render each colour row with its label and an info tooltip', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
-        for (const [key, label, description] of [
-            ['primaryColor', 'Primary', 'Buttons, links, active states and the page header. Applies to both the light and the dark theme.'],
-            ['secondaryColor', 'Secondary', 'Accents, chips and informational badges. Applies to both the light and the dark theme.'],
-            ['backgroundColor', 'Background', 'The page background and raised surfaces such as cards and dialogs. Light theme only.'],
-            ['textColor', 'Text', 'Body text and headings. Light theme only.'],
+        for (const [key, label] of [
+            ['primaryColor', 'Primary'],
+            ['secondaryColor', 'Secondary'],
+            ['backgroundColor', 'Background'],
+            ['textColor', 'Text'],
         ]) {
             const row = page.getByTestId(`color-field-${key}`);
 
             await expect(row).toBeVisible();
             await expect(row).toContainText(label);
-            await expect(row).toContainText(description);
+            await expect(page.getByTestId(`label-tooltip-${key}`)).toBeVisible();
         }
+    });
+
+    test('should say what a colour drives and which theme it reaches on hover', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
+
+        await page.getByTestId('label-tooltip-primaryColor').hover();
+
+        await expect(page.getByRole('tooltip')).toContainText(
+            'Buttons, links, active states and the page header. Applies to both the light and the dark theme.',
+        );
     });
 
     test('should not offer a tertiary colour', async ({ mount, page }) => {
@@ -112,18 +121,17 @@ test.describe('AppearanceSettings', () => {
     });
 
     /**
-     * Emptying a field is a different failure from mistyping one, and the form has to keep saying which: no inline
-     * error, because nothing about the value is wrong, but no Save either, because the brand is now incomplete.
+     * Emptying a field means the colour is unset, which is a saveable state: no inline error, because nothing about
+     * the value is wrong, and Save stays available because a brand does not have to be complete.
      */
-    test('should treat an emptied field as incomplete rather than invalid', async ({ mount, page }) => {
+    test('should treat an emptied field as unset rather than invalid', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
         await setHex(page, 'primaryColor', '');
 
         await expect(page.getByTestId('color-error-primaryColor')).toHaveCount(0);
         // The swatch cannot hold an empty value, so it falls back to black for display only.
         await expect(page.getByTestId('color-swatch-primaryColor')).toHaveValue('#000000');
-        await expect(page.getByTestId('appearance-incomplete')).toContainText('Primary');
-        await expect(page.getByTestId('appearance-save')).toBeDisabled();
+        await expect(page.getByTestId('appearance-save')).toBeEnabled();
     });
 
     test('should keep the save disabled until something changes', async ({ mount, page }) => {
@@ -134,65 +142,71 @@ test.describe('AppearanceSettings', () => {
         await expect(page.getByTestId('appearance-save')).toBeEnabled();
     });
 
-    test('should refuse to save a brand that is only partly filled, naming what is missing', async ({ mount, page }) => {
+    /**
+     * Every part of a brand stands on its own: Core validates each field's format and falls back per field, and the
+     * token layer overrides only what is set, so one colour is as valid a brand as all six fields.
+     */
+    test('should save a brand that sets only one colour', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
         await setHex(page, 'primaryColor', '#0073CF');
 
-        const missing = page.getByTestId('appearance-incomplete');
+        await expect(page.getByTestId('appearance-save')).toBeEnabled();
+        await page.getByTestId('appearance-save').click();
 
-        for (const label of ['Secondary', 'Background', 'Text', 'Light Logo', 'Dark Logo']) {
-            await expect(missing).toContainText(label);
-        }
-        await expect(missing).not.toContainText('Primary,');
-        await expect(page.getByTestId('appearance-save')).toBeDisabled();
+        await expect(page.getByTestId('sent-branding')).toContainText('"primaryColor":"#0073CF"');
     });
 
-    test('should offer the save once every colour and both logos are filled', async ({ mount, page }) => {
+    /**
+     * Core validates the format of any colour it is given, so an empty string is rejected where an absent field is
+     * what clears that part of the brand.
+     */
+    test('should omit an unset colour from the save rather than send an empty string', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
+        await setHex(page, 'secondaryColor', '');
+        await page.getByTestId('appearance-save').click();
+
+        const sent = page.getByTestId('sent-branding');
+
+        await expect(sent).toContainText('"primaryColor":"#0073CF"');
+        await expect(sent).not.toContainText('secondaryColor');
+    });
+
+    test('should offer the save once a single logo is chosen', async ({ mount, page }) => {
         const png = Buffer.from(PNG_DATA_URI.split(',')[1], 'base64');
 
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
-
-        for (const [key, value] of Object.entries(COMPLETE_BRANDING)) {
-            if (key.endsWith('Color')) {
-                await setHex(page, key, value);
-            }
-        }
         await expect(page.getByTestId('appearance-save')).toBeDisabled();
 
         await chooseFile(page.getByTestId('logo-input-lightLogo'), 'light.png', 'image/png', png);
-        await chooseFile(page.getByTestId('logo-input-darkLogo'), 'dark.png', 'image/png', png);
 
-        await expect(page.getByTestId('appearance-incomplete')).toHaveCount(0);
         await expect(page.getByTestId('appearance-save')).toBeEnabled();
     });
 
-    test('should mark every colour and both logos as required', async ({ mount, page }) => {
+    test('should mark no colour or logo as required', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
-        for (const key of ['primaryColor', 'secondaryColor', 'backgroundColor', 'textColor']) {
-            await expect(page.getByTestId(`label-${key}`)).toContainText('*');
-        }
-        for (const key of ['lightLogo', 'darkLogo']) {
-            await expect(page.getByTestId(`label-${key}`)).toContainText('*');
+        for (const key of ['primaryColor', 'secondaryColor', 'backgroundColor', 'textColor', 'lightLogo', 'darkLogo']) {
+            await expect(page.getByTestId(`label-${key}`)).not.toContainText('*');
         }
     });
 
-    test('should say which colours reach which theme, and that neither logo covers for the other', async ({ mount, page }) => {
-        await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
+    test('should clear a colour from its own control', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
 
-        await expect(page.getByTestId('appearance-color-composition')).toContainText('Background and Text apply to the light theme only');
-        await expect(page.getByTestId('appearance-color-composition')).toContainText('No color is inverted to produce the other theme');
-        await expect(page.getByTestId('appearance-logo-composition')).toContainText('Neither slot falls back to the other.');
+        await page.getByTestId('color-clear-primaryColor').click();
+
+        await expect(page.getByTestId('color-hex-primaryColor')).toHaveValue('');
+        await expect(page.getByTestId('color-clear-primaryColor')).toHaveCount(0);
     });
 
-    test('should show the helper text on each logo slot', async ({ mount, page }) => {
+    test('should state the logo requirements behind the info toggletip', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
-        for (const key of ['lightLogo', 'darkLogo']) {
-            await expect(page.getByTestId(`logo-slot-${key}`)).toContainText(
-                'PNG or SVG with a transparent background, up to 1 MB, aspect ratio between 1:1 and 3:1.',
-            );
-        }
+        await page.getByTestId('appearance-logo-help').click();
+
+        await expect(page.getByTestId('appearance-logo-help-content')).toContainText(
+            'PNG or SVG with a transparent background, up to 1 MB, aspect ratio between 1:1 and 3:1.',
+        );
     });
 
     test('should reject a file whose format Core does not accept', async ({ mount, page }) => {
@@ -285,26 +299,63 @@ test.describe('AppearanceSettings', () => {
         await expect(preview).toHaveJSProperty('tagName', 'IMG');
     });
 
-    /**
-     * Deleting one slot leaves the other alone. It also leaves the brand incomplete, which is the point: a logo is
-     * removed by resetting the whole brand, not by saving one half of it, so there is no save to assert here.
-     */
+    /** Deleting one slot leaves the other alone, and dropping a single logo is a brand the form will save. */
     test('should delete only the slot that was cleared', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
         await page.getByTestId('logo-delete-lightLogo').click();
 
         await expect(page.getByTestId('logo-empty-lightLogo')).toBeVisible();
         await expect(page.getByTestId('logo-preview-darkLogo')).toBeVisible();
-
-        await expect(page.getByTestId('appearance-incomplete')).toContainText('Light Logo');
-        await expect(page.getByTestId('appearance-incomplete')).not.toContainText('Dark Logo');
-        await expect(page.getByTestId('appearance-save')).toBeDisabled();
+        await expect(page.getByTestId('appearance-save')).toBeEnabled();
     });
 
-    test('should disable delete on an empty slot', async ({ mount, page }) => {
+    test('should not offer delete on an empty slot', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
-        await expect(page.getByTestId('logo-delete-lightLogo')).toBeDisabled();
+        await expect(page.getByTestId('logo-delete-lightLogo')).toHaveCount(0);
+        await expect(page.getByTestId('logo-delete-darkLogo')).toHaveCount(0);
+    });
+
+    test('should accept a logo dropped onto the slot', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
+        await expect(page.getByTestId('logo-choose-lightLogo')).toBeVisible();
+
+        // A drop cannot be synthesised from the test process: DataTransfer has to be built in the page, and its file
+        // list is read-only, so the file is put there through a DataTransfer the browser itself constructed.
+        await page.evaluate((bytes) => {
+            const zone = document.querySelector<HTMLButtonElement>('[data-testid="logo-choose-lightLogo"]');
+
+            if (!zone) {
+                throw new Error('The logo slot did not render its drop zone.');
+            }
+
+            const transfer = new DataTransfer();
+            transfer.items.add(new File([new Uint8Array(bytes)], 'dropped.png', { type: 'image/png' }));
+            zone.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: transfer }));
+        }, PNG_BYTES);
+
+        await expect(page.getByTestId('logo-preview-lightLogo')).toBeVisible();
+        await expect(page.getByTestId('logo-filename-lightLogo')).toHaveText('dropped.png');
+    });
+
+    test('should reject a dropped file that breaks a rule', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
+        await expect(page.getByTestId('logo-choose-lightLogo')).toBeVisible();
+
+        await page.evaluate(() => {
+            const zone = document.querySelector<HTMLButtonElement>('[data-testid="logo-choose-lightLogo"]');
+
+            if (!zone) {
+                throw new Error('The logo slot did not render its drop zone.');
+            }
+
+            const transfer = new DataTransfer();
+            transfer.items.add(new File([new Uint8Array([0xff, 0xd8])], 'photo.jpg', { type: 'image/jpeg' }));
+            zone.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: transfer }));
+        });
+
+        await expect(page.getByTestId('logo-error-lightLogo')).toHaveText('Logo must be a PNG or an SVG.');
+        await expect(page.getByTestId('logo-preview-lightLogo')).toHaveCount(0);
     });
 
     test('should send the edited colours on save', async ({ mount, page }) => {
@@ -391,6 +442,10 @@ test.describe('AppearanceSettings', () => {
     test('should not let a read still in flight resurrect a slot deleted meanwhile', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
 
+        // Delete is only rendered for a filled slot, so waiting for it is what pins the stored logo as committed
+        // before the browser task below runs.
+        await expect(page.getByTestId('logo-delete-lightLogo')).toBeVisible();
+
         await page.evaluate((bytes) => {
             const input = document.querySelector<HTMLInputElement>('[data-testid="logo-input-lightLogo"]');
             const remove = document.querySelector<HTMLButtonElement>('[data-testid="logo-delete-lightLogo"]');
@@ -408,9 +463,9 @@ test.describe('AppearanceSettings', () => {
         }, PNG_BYTES);
 
         await expect(page.getByTestId('logo-empty-lightLogo')).toBeVisible();
-        // The deleted slot is what the brand is now missing, which is only true if the superseded read did not fill it
-        // back in. Re-checked after those round trips, by which point that read has long settled.
-        await expect(page.getByTestId('appearance-incomplete')).toContainText('Light Logo');
+        // Asserted again after the round trips above, by which point the superseded read has long settled: the slot
+        // staying empty is what pins that it did not write its logo back in.
+        await expect(page.getByTestId('logo-preview-lightLogo')).toHaveCount(0);
         await expect(page.getByTestId('logo-empty-lightLogo')).toBeVisible();
         await expect(page.getByTestId('sent-branding')).toHaveText('none');
     });

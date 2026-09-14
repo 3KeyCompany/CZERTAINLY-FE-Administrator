@@ -58,7 +58,7 @@ export function AttributeFieldFile({
                                         placeholder={`Select or drag & drop ${descriptor.properties.label} File`}
                                         readOnly
                                         className={cn(
-                                            'text-content py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised placeholder-content-subtle',
+                                            'text-content py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised placeholder-content-subtle/50',
                                             {
                                                 'border-danger focus:border-danger focus:ring-danger':
                                                     fieldState.isTouched && fieldState.invalid,

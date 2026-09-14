@@ -5,7 +5,7 @@ import { delay, take, toArray } from 'rxjs/operators';
 import type { PublicBrandingModel } from 'types/branding';
 import { actions as alertActions } from './alerts';
 import { actions as appRedirectActions } from './app-redirect';
-import { platformDefaultBranding, slice } from './branding';
+import { platformDefaultBranding, slice, toPublicBranding } from './branding';
 import epics from './branding-epics';
 
 /** The anonymous response is a fixed shape, so a fixture overrides the platform default rather than listing fields. */
@@ -141,20 +141,29 @@ describe('branding epics', () => {
 
         expect(sent).toEqual([branding]);
         expect(emitted[0]).toEqual(slice.actions.updateBrandingSuccess({ branding: stored }));
-        expect(emitted[1]).toEqual(slice.actions.getPublicBranding());
+        expect(emitted[1]).toEqual(slice.actions.getPublicBrandingSuccess({ branding: toPublicBranding(stored) }));
         expect(emitted[2].type).toBe(alertActions.success.type);
     });
 
     /**
      * The token layer and the theme both resolve from the anonymous response, so a committed save that does not
-     * refresh it leaves the page it was made on rendering the previous palette until the next full reload.
+     * refresh it leaves the page it was made on rendering the previous palette until the next full reload. It is set
+     * from the read-back rather than re-read, because Core serves the anonymous response with a 60-second public
+     * cache and a read issued here is answered from it with the pre-write brand.
      */
-    test('updateBranding refreshes the anonymous read so the committed palette is applied', async () => {
-        const deps = createDeps();
+    test('updateBranding settles the anonymous view without re-reading the cached endpoint', async () => {
+        let anonymousReads = 0;
+        const deps = createDeps({
+            getBranding: () => {
+                anonymousReads += 1;
+                return of(platformDefaultBranding);
+            },
+        });
 
         const emitted = await run(epics[WRITE_BRANDING], slice.actions.updateBranding({ branding: {} }), deps, 3);
 
-        expect(emitted.map((action: { type: string }) => action.type)).toContain(slice.actions.getPublicBranding.type);
+        expect(emitted.map((action: { type: string }) => action.type)).toContain(slice.actions.getPublicBrandingSuccess.type);
+        expect(anonymousReads).toBe(0);
     });
 
     test('updateBranding failure reports the error and redirects', async () => {
@@ -213,17 +222,28 @@ describe('branding epics', () => {
 
         expect(sent).toEqual([{}]);
         expect(emitted[0]).toEqual(slice.actions.resetBrandingSuccess());
-        expect(emitted[1]).toEqual(slice.actions.getPublicBranding());
+        expect(emitted[1]).toEqual(slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }));
         expect(emitted[2].type).toBe(alertActions.success.type);
     });
 
-    /** Unbranding has to take effect on the page it was requested from, for the same reason a save does. */
-    test('resetBranding refreshes the anonymous read so the platform palette is restored', async () => {
-        const deps = createDeps();
+    /**
+     * Unbranding has to take effect on the page it was requested from, and re-reading the anonymous endpoint would
+     * defeat that: its response is publicly cacheable for a minute, so the browser answers with the brand that was
+     * just cleared and the token layer paints it straight back.
+     */
+    test('resetBranding restores the platform palette without re-reading the cached endpoint', async () => {
+        let anonymousReads = 0;
+        const deps = createDeps({
+            getBranding: () => {
+                anonymousReads += 1;
+                return of(platformDefaultBranding);
+            },
+        });
 
         const emitted = await run(epics[WRITE_BRANDING], slice.actions.resetBranding(), deps, 3);
 
-        expect(emitted.map((action: { type: string }) => action.type)).toContain(slice.actions.getPublicBranding.type);
+        expect(emitted).toContainEqual(slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }));
+        expect(anonymousReads).toBe(0);
     });
 
     test('resetBranding failure reports the error and redirects', async () => {
@@ -254,10 +274,10 @@ describe('branding epics', () => {
 
         expect(emitted.map((action: { type: string }) => action.type)).toEqual([
             slice.actions.updateBrandingSuccess.type,
-            slice.actions.getPublicBranding.type,
+            slice.actions.getPublicBrandingSuccess.type,
             alertActions.success.type,
             slice.actions.resetBrandingSuccess.type,
-            slice.actions.getPublicBranding.type,
+            slice.actions.getPublicBrandingSuccess.type,
             alertActions.success.type,
         ]);
     });

@@ -4,10 +4,11 @@ import { AjaxError } from 'rxjs/ajax';
 import { catchError, concatMap, filter, mergeMap, switchMap } from 'rxjs/operators';
 import type { UnknownAction } from 'redux';
 import type { BrandingSettingsUpdateModel } from 'types/branding';
+import { markBrandingChanged } from 'utils/branding';
 import { extractError } from 'utils/net';
 import { actions as alertActions } from './alerts';
 import { actions as appRedirectActions } from './app-redirect';
-import { platformDefaultBranding, slice } from './branding';
+import { platformDefaultBranding, slice, toPublicBranding } from './branding';
 
 /** The write committed and only the read-back failed, which is not the same thing as the save having failed. */
 const READ_BACK_FAILED = 'Branding was saved but could not be read back';
@@ -61,17 +62,18 @@ const runUpdate = (deps: EpicDependencies, branding: BrandingSettingsUpdateModel
         // instead of echoing the request, which would leave the store holding markup Core deliberately removed.
         mergeMap(() =>
             deps.apiClients.settings.getBrandingSettings().pipe(
-                // The anonymous read is refreshed alongside the authenticated one, because it is the anonymous
-                // response that the token layer and the theme resolve from. Without it a committed save would not
-                // reach the page it was made on: the palette and the operator default would stay as they were until
-                // the next full reload.
-                mergeMap((stored) =>
-                    of(
+                // Derived from the read-back rather than re-read: the anonymous response is the one the token layer
+                // resolves from, and re-reading it here would be answered from the browser cache with the pre-write
+                // brand. See `markBrandingChanged`.
+                mergeMap((stored) => {
+                    markBrandingChanged();
+
+                    return of(
                         slice.actions.updateBrandingSuccess({ branding: stored }),
-                        slice.actions.getPublicBranding(),
+                        slice.actions.getPublicBrandingSuccess({ branding: toPublicBranding(stored) }),
                         alertActions.success('Branding updated successfully.'),
-                    ),
-                ),
+                    );
+                }),
                 // Reporting this as a failed save would invite a retry that changes nothing, because the write landed.
                 // The slice is what is wrong — it still holds the pre-write branding — so a fresh read repairs it.
                 catchError((err) =>
@@ -95,10 +97,16 @@ const runReset = (deps: EpicDependencies): Observable<UnknownAction> =>
     // An empty update clears every field, which is what makes reset one request rather than one per field. Nothing is
     // left stored afterwards, so there is no read-back: the reducer settles on an empty branding.
     deps.apiClients.settings.updateBrandingSettings({ brandingSettingsUpdateDto: {} }).pipe(
-        // Refreshed for the same reason as a save: unbranding has to take effect on the page it was requested from.
-        mergeMap(() =>
-            of(slice.actions.resetBrandingSuccess(), slice.actions.getPublicBranding(), alertActions.success('Branding reset to default.')),
-        ),
+        // Set rather than re-read, for the same reason as a save: see `markBrandingChanged`.
+        mergeMap(() => {
+            markBrandingChanged();
+
+            return of(
+                slice.actions.resetBrandingSuccess(),
+                slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }),
+                alertActions.success('Branding reset to default.'),
+            );
+        }),
         catchError((err) =>
             of(
                 slice.actions.resetBrandingFailure({ error: extractError(err, 'Failed to reset branding') }),
