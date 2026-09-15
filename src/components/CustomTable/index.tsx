@@ -791,7 +791,7 @@ function CustomTable({
                                     onChange={(event) => setSearchKey(event.target.value)}
                                     type="text"
                                     disabled={disableSearchControls}
-                                    className="py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg sm:text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised text-content placeholder-content-subtle/50"
+                                    className="py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg sm:text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised text-content placeholder-content-hint"
                                 />
                             </div>
                         </div>
