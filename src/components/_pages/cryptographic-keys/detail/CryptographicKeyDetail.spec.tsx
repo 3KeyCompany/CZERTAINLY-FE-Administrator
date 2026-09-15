@@ -130,4 +130,39 @@ test.describe('CryptographicKeyDetail usage editing', () => {
         // then
         await expect(page.getByRole('option')).toHaveText([allowedPrivateUsage]);
     });
+
+    test('keeps usage editing disabled after a cached profile refresh fails until a retry succeeds', async ({ mount, page }) => {
+        // given
+        const profileUsages = [KeyUsage.Sign];
+        const tokenProfile = aTokenProfile(profileUsages);
+        const cryptographicKey = aSynchronizedKey().withTokenProfile(tokenProfile.uuid).build();
+        await mount(<CryptographicKeyDetailWithStore cryptographicKey={cryptographicKey} tokenProfile={tokenProfile} />);
+        await expect(page.getByTestId('key-button')).toBeEnabled();
+
+        // when
+        await page.getByRole('button', { name: 'Refresh profile', exact: true }).click();
+
+        // then
+        await expect(page.getByTestId('key-button')).toBeDisabled();
+
+        // when
+        await page.getByRole('button', { name: 'Fail profile request' }).click();
+
+        // then
+        await expect(page.getByTestId('key-button')).toBeDisabled();
+
+        // when
+        await page.getByRole('button', { name: 'Refresh profile', exact: true }).click();
+
+        // then
+        await expect(page.getByTestId('key-button')).toBeDisabled();
+
+        // when
+        await page.getByRole('button', { name: 'Complete profile request' }).click();
+
+        // then
+        await expect(page.getByTestId('key-button')).toBeEnabled();
+        await page.getByTestId('key-button').click();
+        await expect(page.getByRole('button', { name: 'Update', exact: true })).toBeEnabled();
+    });
 });

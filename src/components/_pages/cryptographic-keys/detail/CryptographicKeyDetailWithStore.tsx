@@ -32,13 +32,15 @@ type Props = Readonly<{
 export default function CryptographicKeyDetailWithStore({ cryptographicKey, tokenProfile, onAction }: Props) {
     const store = useMemo(() => {
         // Resolve API requests in memory while keeping the real key/profile state transitions.
+        let hasResolvedProfileRequest = false;
         const apiResponses: Middleware = (api) => (next) => (action) => {
             const result = next(action);
             if (keyActions.getCryptographicKeyDetail.match(action)) {
                 api.dispatch(keyActions.getCryptographicKeyDetailSuccess({ cryptographicKey }));
             } else if (keyActions.getHistory.match(action)) {
                 api.dispatch(keyActions.getHistorySuccess({ keyItemUuid: action.payload.keyItemUuid, keyHistory: [] }));
-            } else if (profileActions.getTokenProfileDetail.match(action) && tokenProfile) {
+            } else if (profileActions.getTokenProfileDetail.match(action) && tokenProfile && !hasResolvedProfileRequest) {
+                hasResolvedProfileRequest = true;
                 api.dispatch(profileActions.getTokenProfileDetailSuccess({ tokenProfile }));
             }
             onAction?.(action as UnknownAction);
@@ -57,6 +59,19 @@ export default function CryptographicKeyDetailWithStore({ cryptographicKey, toke
                     <Routes>
                         <Route path="/keys/detail/:id" element={<CryptographicKeyDetail />} />
                     </Routes>
+                    {tokenProfile && (
+                        <>
+                            <button type="button" onClick={() => store.dispatch(profileActions.getTokenProfileDetail(tokenProfile))}>
+                                Refresh profile
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => store.dispatch(profileActions.getTokenProfileDetailSuccess({ tokenProfile }))}
+                            >
+                                Complete profile request
+                            </button>
+                        </>
+                    )}
                     <button
                         type="button"
                         onClick={() => store.dispatch(profileActions.getTokenProfileDetailFailure({ error: 'Profile unavailable' }))}

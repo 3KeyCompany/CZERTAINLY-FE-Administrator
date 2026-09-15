@@ -41,6 +41,7 @@ export default function CryptographicKeyDetail() {
     const cryptographicKey = useSelector(selectors.cryptographicKey);
     const tokenProfile = useSelector(tokenProfileSelectors.tokenProfile);
     const isFetchingTokenProfile = useSelector(tokenProfileSelectors.isFetchingDetail);
+    const tokenProfileFetchSucceeded = useSelector(tokenProfileSelectors.detailFetchSucceeded);
     const tokenInstanceUuid = cryptographicKey?.uuid === id ? cryptographicKey?.tokenInstanceUuid : undefined;
     const tokenProfileUuid = cryptographicKey?.uuid === id ? cryptographicKey?.tokenProfileUuid : undefined;
     // Synchronized keys may have no profile; KeyUsageSelect still filters these usages by key type.
@@ -50,6 +51,7 @@ export default function CryptographicKeyDetail() {
             : tokenProfileUuid &&
                 tokenInstanceUuid &&
                 !isFetchingTokenProfile &&
+                tokenProfileFetchSucceeded &&
                 tokenProfile?.uuid === tokenProfileUuid &&
                 tokenProfile.tokenInstanceUuid === tokenInstanceUuid
               ? tokenProfile.usages
