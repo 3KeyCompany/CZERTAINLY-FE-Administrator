@@ -63,6 +63,7 @@ type Props = {
     disableSelectionControls?: boolean;
     disableSearchControls?: boolean;
     isLoading?: boolean;
+    emptyStateDescription?: string;
 };
 
 const emptyCheckedRows: (string | number)[] = [];
@@ -114,6 +115,7 @@ function CustomTable({
     disableSelectionControls = false,
     disableSearchControls = false,
     isLoading = false,
+    emptyStateDescription = 'There are no records to display here yet',
 }: Readonly<Props>) {
     const location = useLocation();
     const [tblData, setTblData] = useState<TableDataRow[]>(data);
@@ -786,12 +788,13 @@ function CustomTable({
                             <div className="max-w-sm">
                                 <input
                                     id="search"
+                                    aria-label="Search"
                                     placeholder="Search"
                                     value={searchKey}
                                     onChange={(event) => setSearchKey(event.target.value)}
                                     type="text"
                                     disabled={disableSearchControls}
-                                    className="py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg sm:text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised text-content placeholder-content-subtle"
+                                    className="py-2.5 sm:py-3 px-4 block w-full border-outline rounded-lg sm:text-sm focus:border-brand focus:ring-brand disabled:opacity-50 disabled:pointer-events-none bg-surface-raised text-content placeholder-content-hint"
                                 />
                             </div>
                         </div>
@@ -826,7 +829,7 @@ function CustomTable({
                                         <span className="text-xs text-content-subtle">
                                             {data.length > 0
                                                 ? 'Try adjusting your search or filters to see results'
-                                                : 'There are no records to display here yet'}
+                                                : emptyStateDescription}
                                         </span>
                                     </div>
                                 </div>
