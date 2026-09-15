@@ -325,7 +325,6 @@ test.describe('AppearanceSettings', () => {
         await expect(page.getByTestId('logo-delete-darkLogo')).toHaveCount(0);
     });
 
-    /** The zone tints on drag-enter and keeps the tint while the pointer crosses onto its own children. */
     test('should hold the drop-zone highlight across a nested dragenter and dragleave', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
 
