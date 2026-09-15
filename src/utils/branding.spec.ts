@@ -352,7 +352,6 @@ describe('branding', () => {
             vi.unstubAllGlobals();
         });
 
-        /** The mark is dropped once it expires, so a browser that never changes branding again stops paying for it. */
         test('should stop bypassing, and forget the mark, once the window has passed', () => {
             const store = withStorage(new Map());
             markBrandingChanged(1_000_000);

@@ -1,7 +1,7 @@
 import type { AppEpic, EpicDependencies } from 'ducks';
 import { type Observable, of } from 'rxjs';
 import { AjaxError } from 'rxjs/ajax';
-import { catchError, concatMap, filter, mergeMap, switchMap } from 'rxjs/operators';
+import { catchError, concatMap, filter, mergeMap, switchMap, takeUntil } from 'rxjs/operators';
 import type { UnknownAction } from 'redux';
 import type { BrandingSettingsUpdateModel } from 'types/branding';
 import { markBrandingChanged } from 'utils/branding';
@@ -51,6 +51,10 @@ const getPublicBranding: AppEpic = (action$, state$, deps) => {
                         ? of(slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }))
                         : of(slice.actions.getPublicBrandingFailure({ error: extractError(err, 'Failed to get branding') })),
                 ),
+                // A write settles this view itself, from a response that is newer than anything already in flight.
+                // Without this, a read that started before the write resolves after it and puts the replaced brand
+                // back - into the token layer and its cache both.
+                takeUntil(action$.pipe(filter(slice.actions.getPublicBrandingSuccess.match))),
             ),
         ),
     );
@@ -61,14 +65,11 @@ const runUpdate = (deps: EpicDependencies, branding: BrandingSettingsUpdateModel
         // The write answers 204 and Core rewrites SVG logos before storing them, so the stored branding is read back
         // instead of echoing the request, which would leave the store holding markup Core deliberately removed.
         mergeMap(() => {
-            // Marked as soon as the write lands, not after the read-back: the brand has changed on the server either
-            // way, so a read-back failure must not leave the next load reading the replaced brand from the cache.
+            // Marked as soon as the write lands, so a failed read-back still busts the cache.
             markBrandingChanged();
 
             return deps.apiClients.settings.getBrandingSettings().pipe(
-                // Derived from the read-back rather than re-read: the anonymous response is the one the token layer
-                // resolves from, and re-reading it here would be answered from the browser cache with the pre-write
-                // brand. See `markBrandingChanged`.
+                // Derived from the read-back rather than re-read - see `markBrandingChanged`.
                 mergeMap((stored) =>
                     of(
                         slice.actions.updateBrandingSuccess({ branding: stored }),
@@ -83,8 +84,7 @@ const runUpdate = (deps: EpicDependencies, branding: BrandingSettingsUpdateModel
                         slice.actions.updateBrandingFailure({ error: extractError(err, READ_BACK_FAILED) }),
                         appRedirectActions.fetchError({ error: err, message: READ_BACK_FAILED }),
                         slice.actions.getBranding(),
-                        // The write landed, so the applied palette is stale too - and the mark above lets this read
-                        // past the browser cache that would otherwise answer it with the replaced brand.
+                        // The write landed, so the applied palette is stale too; the mark above lets this read past the cache.
                         slice.actions.getPublicBranding(),
                     ),
                 ),

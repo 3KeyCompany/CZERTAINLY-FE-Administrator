@@ -786,6 +786,7 @@ function CustomTable({
                             <div className="max-w-sm">
                                 <input
                                     id="search"
+                                    aria-label="Search"
                                     placeholder="Search"
                                     value={searchKey}
                                     onChange={(event) => setSearchKey(event.target.value)}

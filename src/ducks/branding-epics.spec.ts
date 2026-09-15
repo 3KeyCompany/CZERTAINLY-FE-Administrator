@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { firstValueFrom, lastValueFrom, type Observable, of, throwError } from 'rxjs';
+import { firstValueFrom, lastValueFrom, type Observable, of, Subject, throwError } from 'rxjs';
 import { AjaxError } from 'rxjs/ajax';
 import { delay, take, toArray } from 'rxjs/operators';
+import type { UnknownAction } from 'redux';
 import type { PublicBrandingModel } from 'types/branding';
 import { actions as alertActions } from './alerts';
 import { actions as appRedirectActions } from './app-redirect';
@@ -264,6 +265,39 @@ describe('branding epics', () => {
 
         expect(emitted).toContainEqual(slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }));
         expect(anonymousReads).toBe(0);
+    });
+
+    /** Without this the reset call could be deleted and every test would stay green, which is the defect it prevents. */
+    test('resetBranding marks the cache window on success and not on failure', async () => {
+        const marked: number[] = [];
+        vi.spyOn(brandingUtils, 'markBrandingChanged').mockImplementation(() => void marked.push(1));
+
+        await run(epics[WRITE_BRANDING], slice.actions.resetBranding(), createDeps(), 3);
+        expect(marked).toHaveLength(1);
+
+        const rejecting = createDeps({ updateBrandingSettings: () => throwError(() => new Error('denied')) });
+        await runAll(epics[WRITE_BRANDING], slice.actions.resetBranding(), rejecting);
+        expect(marked).toHaveLength(1);
+    });
+
+    /**
+     * A read that started before the write must not settle after it. `getPublicBrandingSuccess` is dispatched by the
+     * write rather than routed through the read epic's `switchMap`, so the read epic cancels itself on one instead.
+     */
+    test('should drop an anonymous read that a newer authoritative result has superseded', async () => {
+        const inFlight = new Subject<PublicBrandingModel>();
+        const deps = createDeps({ getBranding: () => inFlight });
+        const action$ = new Subject<UnknownAction>();
+        const emitted: UnknownAction[] = [];
+        const subscription = (epics[GET_PUBLIC_BRANDING] as EpicUnderTest)(action$, of({}), deps).subscribe((a) => emitted.push(a));
+
+        action$.next(slice.actions.getPublicBranding());
+        action$.next(slice.actions.getPublicBrandingSuccess({ branding: platformDefaultBranding }));
+        inFlight.next({ ...platformDefaultBranding, configured: true, primaryColor: '#0073CF' });
+        inFlight.complete();
+
+        expect(emitted).toEqual([]);
+        subscription.unsubscribe();
     });
 
     test('resetBranding failure reports the error and redirects', async () => {

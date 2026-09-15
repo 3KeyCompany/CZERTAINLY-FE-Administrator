@@ -12,7 +12,10 @@ export const TRIGGER_CLEARABLE_CLASSES =
 
 export const TRIGGER_DISABLED_CLASSES = 'pointer-events-none opacity-50';
 
-export const PLACEHOLDER_CLASSES = 'text-content-subtle';
+export const PLACEHOLDER_CLASSES = 'text-content-hint';
+
+/** The empty-state message shares the placeholder's slot but is not an example value, so it keeps body contrast. */
+export const TRIGGER_NO_OPTIONS_CLASSES = 'text-content-subtle';
 
 export const CHEVRON_CLASSES = 'absolute top-1/2 end-3 -translate-y-1/2 shrink-0 size-3.5 text-content-subtle';
 

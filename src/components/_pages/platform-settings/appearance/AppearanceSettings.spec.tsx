@@ -132,11 +132,7 @@ test.describe('AppearanceSettings', () => {
         await expect(page.getByTestId('appearance-save')).toBeDisabled();
     });
 
-    /**
-     * Emptying a field means the colour is unset, which is a saveable state: no inline error, because nothing about
-     * the value is wrong, and Save stays available because a brand does not have to be complete.
-     */
-    test('should treat an emptied field as unset rather than invalid', async ({ mount, page }) => {
+    test('should treat an emptied field as a saveable unset value rather than invalid input', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
         await setHex(page, 'primaryColor', '');
 
@@ -313,8 +309,7 @@ test.describe('AppearanceSettings', () => {
         await expect(preview).toHaveJSProperty('tagName', 'IMG');
     });
 
-    /** Deleting one slot leaves the other alone, and dropping a single logo is a brand the form will save. */
-    test('should delete only the slot that was cleared', async ({ mount, page }) => {
+    test('should delete only the selected slot and keep the one-logo brand saveable', async ({ mount, page }) => {
         await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
         await page.getByTestId('logo-delete-lightLogo').click();
 
@@ -328,6 +323,51 @@ test.describe('AppearanceSettings', () => {
 
         await expect(page.getByTestId('logo-delete-lightLogo')).toHaveCount(0);
         await expect(page.getByTestId('logo-delete-darkLogo')).toHaveCount(0);
+    });
+
+    /** The zone tints on drag-enter and keeps the tint while the pointer crosses onto its own children. */
+    test('should hold the drop-zone highlight across a nested dragenter and dragleave', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={unbranded} />);
+
+        const zone = page.getByTestId('logo-choose-lightLogo');
+        await expect(zone).toBeVisible();
+
+        // Dispatched one at a time and asserted through the retrying matcher: the highlight is React state, so
+        // reading className in the same task as the dispatch races the re-render. The pattern is anchored because
+        // the resting zone carries `hover:border-brand`, which a bare `border-brand` match would hit.
+        const fire = (event: string, onChild = false) =>
+            page.evaluate(
+                ([name, child]) => {
+                    const el = document.querySelector<HTMLButtonElement>('[data-testid="logo-choose-lightLogo"]');
+
+                    if (!el) {
+                        throw new Error('The logo slot did not render its drop zone.');
+                    }
+
+                    const target = child === 'child' ? (el.firstElementChild ?? el) : el;
+                    target.dispatchEvent(new DragEvent(name, { bubbles: true, dataTransfer: new DataTransfer() }));
+                },
+                [event, onChild ? 'child' : 'self'],
+            );
+
+        await fire('dragenter');
+        await expect(zone).toHaveClass(/(^|\s)border-brand(\s|$)/);
+
+        // Entering a child fires dragleave on the zone; the pointer has not left it, so the tint must hold.
+        await fire('dragenter', true);
+        await fire('dragleave');
+        await expect(zone).toHaveClass(/(^|\s)border-brand(\s|$)/);
+
+        await fire('dragleave');
+        await expect(zone).not.toHaveClass(/(^|\s)border-brand(\s|$)/);
+    });
+
+    test('should move focus to the drop zone when a logo is deleted', async ({ mount, page }) => {
+        await mount(<AppearanceSettingsTestWrapper preloadedState={branded} />);
+
+        await page.getByTestId('logo-delete-lightLogo').click();
+
+        await expect(page.getByTestId('logo-choose-lightLogo')).toBeFocused();
     });
 
     test('should accept a logo dropped onto the slot', async ({ mount, page }) => {
