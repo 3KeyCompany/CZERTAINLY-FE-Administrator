@@ -38,6 +38,12 @@ const COLOR_FIELDS: ReadonlyArray<{ key: ColorKey; label: string; description: s
     { key: 'textColor', label: 'Text', description: 'Body text and headings. Light theme only.' },
 ];
 
+/**
+ * The half of the old composition note that outlived the completeness rule. An empty slot falls back to the platform
+ * mark, not to the other slot, which only became reachable once a one-logo brand could be saved.
+ */
+const LOGO_FALLBACK = "Each theme uses its own logo. A slot left empty shows the platform logo in that theme rather than the other slot's.";
+
 const LOGO_SLOTS: ReadonlyArray<{ key: LogoKey; label: string }> = [
     { key: 'lightLogo', label: 'Light' },
     { key: 'darkLogo', label: 'Dark' },
@@ -259,7 +265,16 @@ function AppearanceSettings() {
             <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                     <h3 className="text-lg font-bold text-content">Logos</h3>
-                    <Toggletip ariaLabel="Logo requirements" content={LOGO_HELP} dataTestId="appearance-logo-help" />
+                    <Toggletip
+                        ariaLabel="Logo requirements"
+                        content={
+                            <>
+                                <p>{LOGO_HELP}</p>
+                                <p className="mt-2">{LOGO_FALLBACK}</p>
+                            </>
+                        }
+                        dataTestId="appearance-logo-help"
+                    />
                 </div>
                 <div className="grid gap-6 @md:grid-cols-2">
                     {LOGO_SLOTS.map(({ key, label }) => (

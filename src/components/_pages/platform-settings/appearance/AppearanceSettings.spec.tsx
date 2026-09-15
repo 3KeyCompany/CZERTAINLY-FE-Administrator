@@ -216,9 +216,11 @@ test.describe('AppearanceSettings', () => {
 
         await page.getByTestId('appearance-logo-help').click();
 
-        await expect(page.getByTestId('appearance-logo-help-content')).toContainText(
-            'PNG or SVG with a transparent background, up to 1 MB, aspect ratio between 1:1 and 3:1.',
-        );
+        const content = page.getByTestId('appearance-logo-help-content');
+
+        await expect(content).toContainText('PNG or SVG with a transparent background, up to 1 MB, aspect ratio between 1:1 and 3:1.');
+        // A one-logo brand is saveable now, so the tab has to say what the empty slot falls back to.
+        await expect(content).toContainText('shows the platform logo in that theme');
     });
 
     test('should reject a file whose format Core does not accept', async ({ mount, page }) => {
