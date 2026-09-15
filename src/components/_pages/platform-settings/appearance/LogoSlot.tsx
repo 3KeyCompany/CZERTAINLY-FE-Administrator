@@ -92,6 +92,9 @@ function LogoSlot({ id, label, value, fileName, error, onSelect, onDelete, disab
                         value && !isDraggingOver && 'border-solid border-divider bg-surface-raised',
                     )}
                     id={`${id}-dropzone`}
+                    // A filled slot would otherwise be named by the preview's alt text alone, which says what the
+                    // image is and not that activating the button replaces it.
+                    aria-label={value ? `Replace ${label} logo` : `Add ${label} logo`}
                     data-testid={`logo-choose-${id}`}
                 >
                     {value ? (
