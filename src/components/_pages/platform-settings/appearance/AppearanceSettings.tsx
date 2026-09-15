@@ -38,10 +38,7 @@ const COLOR_FIELDS: ReadonlyArray<{ key: ColorKey; label: string; description: s
     { key: 'textColor', label: 'Text', description: 'Body text and headings. Light theme only.' },
 ];
 
-/**
- * The half of the old composition note that outlived the completeness rule. An empty slot falls back to the platform
- * mark, not to the other slot, which only became reachable once a one-logo brand could be saved.
- */
+/** An empty slot falls back to the platform mark, not to the other slot. */
 const LOGO_FALLBACK = "Each theme uses its own logo. A slot left empty shows the platform logo in that theme rather than the other slot's.";
 
 const LOGO_SLOTS: ReadonlyArray<{ key: LogoKey; label: string }> = [
