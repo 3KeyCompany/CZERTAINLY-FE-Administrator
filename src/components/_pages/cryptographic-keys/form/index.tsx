@@ -329,7 +329,7 @@ export default function CryptographicKeyForm({ keyId, onSuccess, onCancel, usesG
                 content: cryptographicKeyAttributeDescriptors ? (
                     <AttributeEditor
                         id="cryptographicKey"
-                        callbackParentUuid={keyDetail?.tokenProfileUuid || tokenProfileUuid || ''}
+                        callbackParentUuid={tokenProfileUuid || ''}
                         callbackResource={Resource.Keys}
                         attributeDescriptors={cryptographicKeyAttributeDescriptors || []}
                         groupAttributesCallbackAttributes={groupAttributesCallbackAttributes}

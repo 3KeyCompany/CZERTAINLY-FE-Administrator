@@ -1,6 +1,10 @@
 import { test, expect, type Page } from 'playwright/ct-test';
 import CryptographicKeyFormWithStore from 'components/_pages/cryptographic-keys/form/CryptographicKeyFormWithStore';
-import { KeyRequestType, TokenInstanceStatus } from 'types/openapi';
+import { AttributeContentType, AttributeType, KeyRequestType, Resource, TokenInstanceStatus } from 'types/openapi';
+import { actions as keyActions } from 'ducks/cryptographic-keys';
+import { actions as connectorActions } from 'ducks/connectors';
+import type { UnknownAction } from '@reduxjs/toolkit';
+import type { DataAttributeModel } from 'types/attributes';
 import type { TokenProfileResponseModel } from 'types/token-profiles';
 
 function aTokenProfile() {
@@ -34,6 +38,68 @@ async function selectKeyType(page: Page, type: KeyRequestType) {
 }
 
 test.describe('CryptographicKeyForm', () => {
+    for (const [previousName, selectedName] of [
+        ['NG', 'PKCS12'],
+        ['PKCS12', 'NG'],
+    ]) {
+        test(`routes creation callbacks to the selected ${selectedName} profile after viewing ${previousName}`, async ({ mount, page }) => {
+            // given
+            const previousProfile = aTokenProfile().withIdentity(previousName, previousName).build();
+            const selectedProfile = aTokenProfile().withIdentity(selectedName, selectedName).build();
+            const keyType = KeyRequestType.KeyPair;
+            const actions: UnknownAction[] = [];
+            const algorithm: DataAttributeModel = {
+                uuid: 'algorithm',
+                name: 'algorithm',
+                type: AttributeType.Data,
+                contentType: AttributeContentType.String,
+                properties: { label: 'Algorithm', required: false, readOnly: false, visible: true, list: true, multiSelect: false },
+                attributeCallback: { mappings: [], dependsOn: ['keySpec'] },
+            };
+            const keySpec: DataAttributeModel = {
+                ...algorithm,
+                uuid: 'key-spec',
+                name: 'keySpec',
+                properties: { ...algorithm.properties, label: 'Key specification', list: false },
+                attributeCallback: undefined,
+            };
+            await mount(
+                <CryptographicKeyFormWithStore
+                    usesGlobalModal
+                    tokenProfiles={[previousProfile, selectedProfile]}
+                    supportedKeyRequestTypesByProfile={{ [previousProfile.uuid]: [keyType], [selectedProfile.uuid]: [keyType] }}
+                    keyDetail={{ uuid: 'viewed-key', name: 'Viewed key', creationTime: '', tokenProfileUuid: previousProfile.uuid }}
+                    attributeDescriptors={[keySpec, algorithm]}
+                    onAction={(action) => actions.push(action)}
+                />,
+            );
+
+            // when: select a different profile, then switch profiles while the old detail remains populated
+            for (const profile of [selectedProfile, previousProfile, selectedProfile]) {
+                actions.length = 0;
+                await selectTokenProfile(page, profile);
+                await selectKeyType(page, keyType);
+                const keySpecInput = page.getByTestId('text-input-__attributes__cryptographicKey__.keySpec');
+                await keySpecInput.click();
+                await keySpecInput.fill(profile.name);
+
+                // then
+                await expect
+                    .poll(() => actions.filter(keyActions.listAttributeDescriptors.match).map((action) => action.payload))
+                    .toContainEqual({
+                        tokenInstanceUuid: profile.tokenInstanceUuid,
+                        tokenProfileUuid: profile.uuid,
+                        keyRequestType: keyType,
+                    });
+                await expect
+                    .poll(() => actions.filter(connectorActions.callbackResource.match).map((action) => action.payload.callbackResource))
+                    .toContainEqual(expect.objectContaining({ parentObjectUuid: profile.uuid, resource: Resource.Keys }));
+                await expect.poll(() => actions.filter(connectorActions.callbackSuccess.match)).not.toHaveLength(0);
+                await expect(page.getByTestId('spinner')).toHaveCount(0);
+            }
+        });
+    }
+
     test('keeps Key Type visible, enabled, and selected when the current token profile is selected again', async ({ mount, page }) => {
         // given
         const tokenProfile = aTokenProfile().build();

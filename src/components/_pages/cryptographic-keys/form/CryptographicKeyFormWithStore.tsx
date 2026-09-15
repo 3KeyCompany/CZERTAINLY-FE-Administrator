@@ -4,9 +4,12 @@ import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import CryptographicKeyForm from 'components/_pages/cryptographic-keys/form';
 import { actions as keyActions, slice as keySlice, type State as KeyState } from 'ducks/cryptographic-keys';
+import { actions as connectorActions } from 'ducks/connectors';
+import { actions as customAttributeActions } from 'ducks/customAttributes';
 import { testInitialState, testReducers } from 'ducks/test-reducers';
 import type { KeyRequestType } from 'types/openapi';
 import type { TokenProfileResponseModel } from 'types/token-profiles';
+import type { AttributeDescriptorModel } from 'types/attributes';
 import { createMockStore } from 'utils/test-helpers';
 
 type State = Omit<ReturnType<typeof testReducers>, 'cryptographicKeys'> & { cryptographicKeys: KeyState };
@@ -25,6 +28,9 @@ export type CryptographicKeyFormWithStoreProps = Readonly<{
     usesGlobalModal?: boolean;
     tokenProfiles?: TokenProfileResponseModel[];
     supportedKeyRequestTypesByProfile?: Record<string, KeyRequestType[]>;
+    keyDetail?: KeyState['cryptographicKey'];
+    attributeDescriptors?: AttributeDescriptorModel[];
+    onAction?: (action: UnknownAction) => void;
 }>;
 
 /** See TokenProfileFormWithStore — same harness for the sibling form behind the Key dropdown's "+". */
@@ -34,12 +40,16 @@ export function CryptographicKeyFormWithStore({
     usesGlobalModal = false,
     tokenProfiles,
     supportedKeyRequestTypesByProfile,
+    keyDetail,
+    attributeDescriptors,
+    onAction,
 }: CryptographicKeyFormWithStoreProps) {
     const store = useMemo(() => {
         if (!tokenProfiles) return createMockStore();
 
         const apiResponses: Middleware = (api) => (next) => (action) => {
             const result = next(action);
+            onAction?.(action as UnknownAction);
             if (keyActions.listSupportedKeyRequestTypes.match(action)) {
                 api.dispatch(
                     keyActions.listSupportedKeyRequestTypesSuccess(
@@ -48,8 +58,15 @@ export function CryptographicKeyFormWithStore({
                 );
             } else if (keyActions.listAttributeDescriptors.match(action)) {
                 api.dispatch(
-                    keyActions.listAttributeDescriptorsSuccess({ uuid: action.payload.tokenProfileUuid, attributeDescriptors: [] }),
+                    keyActions.listAttributeDescriptorsSuccess({
+                        uuid: action.payload.tokenProfileUuid,
+                        attributeDescriptors: attributeDescriptors ?? [],
+                    }),
                 );
+            } else if (connectorActions.callbackResource.match(action) || connectorActions.callbackConnector.match(action)) {
+                api.dispatch(connectorActions.callbackSuccess({ callbackId: action.payload.callbackId, data: [] }));
+            } else if (customAttributeActions.listResourceCustomAttributes.match(action)) {
+                api.dispatch(customAttributeActions.listResourceCustomAttributesSuccess([]));
             }
             return result;
         };
@@ -60,10 +77,10 @@ export function CryptographicKeyFormWithStore({
             preloadedState: {
                 ...testInitialState,
                 tokenprofiles: { tokenProfiles },
-                cryptographicKeys: keySlice.getInitialState(),
+                cryptographicKeys: { ...keySlice.getInitialState(), cryptographicKey: keyDetail },
             },
         });
-    }, [tokenProfiles, supportedKeyRequestTypesByProfile]);
+    }, [tokenProfiles, supportedKeyRequestTypesByProfile, keyDetail, attributeDescriptors, onAction]);
 
     return (
         <Provider store={store}>
