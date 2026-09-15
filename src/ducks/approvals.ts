@@ -52,8 +52,8 @@ export const slice = createSlice({
             state.isFetchingDetail = false;
         },
 
+        // A failed refetch keeps the approval on screen; a different uuid was already cleared by getApproval.
         getApprovalFailure: (state, action: PayloadAction<{ error: string | undefined }>) => {
-            state.approvalDetails = undefined;
             state.isFetchingDetail = false;
         },
 

@@ -22,6 +22,16 @@ describe('approvals slice', () => {
         expect(next.approvalDetails).toEqual({ approvalUuid: 'a1' });
 
         next = reducer({ ...next, isFetchingDetail: true }, actions.getApprovalFailure({ error: 'err' }));
+        expect(next.approvalDetails).toEqual({ approvalUuid: 'a1' });
+        expect(next.isFetchingDetail).toBe(false);
+    });
+
+    test('a failed first load of an approval leaves no detail behind', () => {
+        const loaded = { ...initialState, approvalDetails: { approvalUuid: 'a1' } as any };
+
+        let next = reducer(loaded, actions.getApproval({ uuid: 'a2' }));
+        next = reducer(next, actions.getApprovalFailure({ error: 'err' }));
+
         expect(next.approvalDetails).toBeUndefined();
         expect(next.isFetchingDetail).toBe(false);
     });
@@ -42,7 +52,7 @@ describe('approvals slice', () => {
         expect(next.approvalDetails).toBeUndefined();
     });
 
-    test('a failed detail refresh after a recipient decision stops the detail loading', () => {
+    test('a failed detail refresh after a recipient decision stops the loading and keeps the approval on screen', () => {
         const loaded = { ...initialState, approvalDetails: { approvalUuid: 'a1' } as any };
 
         let next = reducer(loaded, actions.approveApprovalRecipient({ uuid: 'a1', userApproval: { comment: 'ok' } }));
@@ -52,6 +62,7 @@ describe('approvals slice', () => {
 
         next = reducer(next, actions.getApprovalFailure({ error: 'err' }));
         expect(next.isFetchingDetail).toBe(false);
+        expect(next.approvalDetails).toMatchObject({ approvalUuid: 'a1' });
     });
 
     test('listApprovals / success / failure', () => {

@@ -4,23 +4,18 @@ import { firstValueFrom, of } from 'rxjs';
 import { take, toArray } from 'rxjs/operators';
 
 import { actions as approvalActions } from './approvals';
+import { approveApprovalRecipient, rejectApprovalRecipient } from './approvals-epic';
 
-enum ApprovalsEpicIndex {
-    ApproveRecipient = 4,
-    RejectRecipient = 6,
-}
-
-async function runEpic(epicIndex: ApprovalsEpicIndex, action: UnknownAction, approvalsApi: Record<string, (args: any) => any>) {
-    const { default: epics } = await import('./approvals-epic');
+function runEpic(epic: typeof approveApprovalRecipient, action: UnknownAction, approvalsApi: Record<string, (args: any) => any>) {
     const deps = { apiClients: { approvals: approvalsApi } };
-    const output$ = (epics as any)[epicIndex](of(action), of({}) as any, deps as any);
+    const output$ = epic(of(action) as any, of({}) as any, deps as any);
     return firstValueFrom(output$.pipe(take(2), toArray())) as Promise<UnknownAction[]>;
 }
 
 describe('approvals epics', () => {
     test('approveApprovalRecipient sends the comment and reloads the approval detail', async () => {
         const emitted = await runEpic(
-            ApprovalsEpicIndex.ApproveRecipient,
+            approveApprovalRecipient,
             approvalActions.approveApprovalRecipient({ uuid: 'a1', userApproval: { comment: 'looks good' } }),
             {
                 approveApprovalRecipient: ({ uuid, userApprovalDto }: { uuid: string; userApprovalDto: { comment?: string } }) => {
@@ -39,7 +34,7 @@ describe('approvals epics', () => {
 
     test('rejectApprovalRecipient sends the comment and reloads the approval detail', async () => {
         const emitted = await runEpic(
-            ApprovalsEpicIndex.RejectRecipient,
+            rejectApprovalRecipient,
             approvalActions.rejectApprovalRecipient({ uuid: 'a1', userApproval: { comment: 'not allowed' } }),
             {
                 rejectApprovalRecipient: ({ uuid, userApprovalDto }: { uuid: string; userApprovalDto: { comment?: string } }) => {

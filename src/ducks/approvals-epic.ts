@@ -101,7 +101,7 @@ const approveApproval: AppEpic = (action$, state$, deps) => {
     );
 };
 
-const approveApprovalRecipient: AppEpic = (action$, state$, deps) => {
+export const approveApprovalRecipient: AppEpic = (action$, state$, deps) => {
     return action$.pipe(
         filter(slice.actions.approveApprovalRecipient.match),
 
@@ -149,7 +149,7 @@ const rejectApproval: AppEpic = (action$, state$, deps) => {
     );
 };
 
-const rejectApprovalRecipient: AppEpic = (action$, state$, deps) => {
+export const rejectApprovalRecipient: AppEpic = (action$, state$, deps) => {
     return action$.pipe(
         filter(slice.actions.rejectApprovalRecipient.match),
 
