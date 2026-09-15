@@ -20,16 +20,20 @@ export const updateRaProfileRequestAttributes: AppEpic = (action$, state$, deps)
                     raProfileCertificateRequestAttributesUpdateDto: action.payload.data,
                 })
                 .pipe(
-                    switchMap((raProfileDto) =>
-                        of(
-                            slice.actions.updateRaProfileRequestAttributesSuccess({ set: raProfileDto.certificateRequestAttributes }),
-                            raProfilesActions.raProfileRequestAttributesUpdated({
-                                uuid: action.payload.raProfileUuid,
-                                certificateRequestAttributes: raProfileDto.certificateRequestAttributes,
-                            }),
+                    switchMap((raProfileDto) => {
+                        const { authorityUuid, raProfileUuid } = action.payload;
+                        const set = raProfileDto.certificateRequestAttributes;
+                        return of(
+                            slice.actions.updateRaProfileRequestAttributesSuccess({ set }),
+                            set
+                                ? raProfilesActions.raProfileRequestAttributesUpdated({
+                                      uuid: raProfileUuid,
+                                      certificateRequestAttributes: set,
+                                  })
+                                : raProfilesActions.getRaProfileDetail({ authorityUuid, uuid: raProfileUuid }),
                             alertActions.success('Request attributes updated successfully.'),
-                        ),
-                    ),
+                        );
+                    }),
                     catchError((err) =>
                         of(
                             slice.actions.updateRaProfileRequestAttributesFailure({

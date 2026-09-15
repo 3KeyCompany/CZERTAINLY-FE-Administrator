@@ -93,6 +93,16 @@ describe('raProfileRequestAttributes epics', () => {
             });
         });
 
+        test('rereads the profile instead of patching it when the response omits the set', async () => {
+            const out = await runEpic('updateRaProfileRequestAttributes', action, {
+                takeCount: 3,
+                depsOverrides: { raProfiles: { updateRaProfileRequestAttributesConfiguration: () => of({ uuid: 'ra-1' }) } },
+            });
+            expect(out.map((a) => a.type)).not.toContain(raProfilesActions.raProfileRequestAttributesUpdated.type);
+            expect(out[1].type).toBe(raProfilesActions.getRaProfileDetail.type);
+            expect((out[1] as any).payload).toEqual({ authorityUuid: 'auth-1', uuid: 'ra-1' });
+        });
+
         test('emits failure on error', async () => {
             const out = await runEpic('updateRaProfileRequestAttributes', action, {
                 takeCount: 1,

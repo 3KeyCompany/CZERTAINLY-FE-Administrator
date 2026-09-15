@@ -276,11 +276,12 @@ export const slice = createSlice({
         },
 
         // The Attributes-tab widget saves through the raProfileRequestAttributes duck, whose PATCH
-        // response already carries the persisted set, so the loaded profile is patched in place
-        // instead of being refetched (which would put the whole detail page into its busy state).
+        // response carries the persisted set, so the loaded profile is patched in place instead of
+        // being refetched (which would put the whole detail page into its busy state). The epic only
+        // dispatches this when the response actually carries the set; otherwise it refetches.
         raProfileRequestAttributesUpdated: (
             state,
-            action: PayloadAction<{ uuid: string; certificateRequestAttributes?: RaProfileCertificateRequestAttributesDto }>,
+            action: PayloadAction<{ uuid: string; certificateRequestAttributes: RaProfileCertificateRequestAttributesDto }>,
         ) => {
             if (state.raProfile?.uuid === action.payload.uuid) {
                 state.raProfile.certificateRequestAttributes = action.payload.certificateRequestAttributes;
