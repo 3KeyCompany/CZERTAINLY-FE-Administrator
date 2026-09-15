@@ -363,6 +363,17 @@ describe('branding', () => {
             vi.unstubAllGlobals();
         });
 
+        /** A clock that steps backwards (NTP correction, VM resume) would otherwise pin the bypass on for good. */
+        test('should stop bypassing when the mark is in the future', () => {
+            const store = withStorage(new Map());
+            markBrandingChanged(2_000_000);
+
+            expect(shouldBypassBrandingCache(1_000_000)).toBe(false);
+            expect(store.has(KEY)).toBe(false);
+
+            vi.unstubAllGlobals();
+        });
+
         test('should ignore a stored value that is not a number', () => {
             withStorage(new Map([[KEY, 'not-a-timestamp']]));
 

@@ -43,7 +43,7 @@ function ColorField({ id, label, description, value, onChange, disabled = false 
                 <Label htmlFor={id} className="mb-0">
                     {label}
                 </Label>
-                <Toggletip ariaLabel={`${label} color`} content={description} dataTestId={`color-help-${id}`} />
+                <Toggletip ariaLabel={`About the ${label} color`} content={description} dataTestId={`color-help-${id}`} />
             </div>
             <div className="flex items-stretch gap-3">
                 <div className="grow">

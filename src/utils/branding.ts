@@ -240,7 +240,7 @@ export const shouldBypassBrandingCache = (now: number = Date.now()): boolean => 
 
         const changedAt = Number(stored);
 
-        if (!Number.isFinite(changedAt) || now - changedAt > BRANDING_CACHE_BYPASS_WINDOW_MS) {
+        if (!Number.isFinite(changedAt) || Math.abs(now - changedAt) > BRANDING_CACHE_BYPASS_WINDOW_MS) {
             globalThis.localStorage?.removeItem(BRANDING_CHANGED_STORAGE_KEY);
             return false;
         }
