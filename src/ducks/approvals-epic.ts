@@ -112,7 +112,12 @@ const approveApprovalRecipient: AppEpic = (action$, state$, deps) => {
                     userApprovalDto: action.payload.userApproval,
                 })
                 .pipe(
-                    switchMap(() => of(slice.actions.approveApprovalRecipientSuccess({ uuid: action.payload.uuid }))),
+                    switchMap(() =>
+                        of(
+                            slice.actions.approveApprovalRecipientSuccess({ uuid: action.payload.uuid }),
+                            slice.actions.getApproval({ uuid: action.payload.uuid }),
+                        ),
+                    ),
 
                     catchError((err) =>
                         of(
@@ -155,7 +160,12 @@ const rejectApprovalRecipient: AppEpic = (action$, state$, deps) => {
                     userApprovalDto: action.payload.userApproval,
                 })
                 .pipe(
-                    switchMap(() => of(slice.actions.rejectApprovalRecipientSuccess({ uuid: action.payload.uuid }))),
+                    switchMap(() =>
+                        of(
+                            slice.actions.rejectApprovalRecipientSuccess({ uuid: action.payload.uuid }),
+                            slice.actions.getApproval({ uuid: action.payload.uuid }),
+                        ),
+                    ),
 
                     catchError((err) =>
                         of(

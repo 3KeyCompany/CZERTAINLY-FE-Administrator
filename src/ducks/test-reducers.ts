@@ -1021,6 +1021,36 @@ function certificateGroupsTestReducer(state: CertificateGroupsTestState | undefi
     return state ?? certificateGroupsTestInitialState;
 }
 
+export type ApprovalsTestState = {
+    approvalDetails?: any;
+    approvals: any[];
+    approvalsTotalItems: number;
+    userApprovals: any[];
+    userApprovalsTotalItems: number;
+    isApproving: boolean;
+    isRejecting: boolean;
+    isFetchingDetail: boolean;
+    isFetchingList: boolean;
+    isFetchingUserList: boolean;
+};
+
+const approvalsTestInitialState: ApprovalsTestState = {
+    approvalDetails: undefined,
+    approvals: [],
+    approvalsTotalItems: 0,
+    userApprovals: [],
+    userApprovalsTotalItems: 0,
+    isApproving: false,
+    isRejecting: false,
+    isFetchingDetail: false,
+    isFetchingList: false,
+    isFetchingUserList: false,
+};
+
+function approvalsTestReducer(state: ApprovalsTestState | undefined, _action: UnknownAction): ApprovalsTestState {
+    return state ?? approvalsTestInitialState;
+}
+
 // Reducer key must match the real slice.name ('oids') so the real OID selectors (used by
 // useOidMappingOptions and RequestAttributeMappingBadge) read this state. Every field of the real
 // duck's State is mirrored here: once this slice exists in the store the duck's `?? initialState`
@@ -1381,6 +1411,7 @@ export const testReducers = combineReducers({
     cryptographicKeys: cryptographicKeysTestReducer,
     users: usersTestReducer,
     certificateGroups: certificateGroupsTestReducer,
+    approvals: approvalsTestReducer,
     discoveries: discoveriesTestReducer,
     oids: oidsTestReducer,
     rules: rulesTestReducer,
@@ -1420,6 +1451,7 @@ export const testInitialState = {
     cryptographicKeys: cryptographicKeysTestInitialState,
     users: usersTestInitialState,
     certificateGroups: certificateGroupsTestInitialState,
+    approvals: approvalsTestInitialState,
     discoveries: discoveriesTestInitialState,
     oids: oidsTestInitialState,
     rules: rulesTestInitialState,
