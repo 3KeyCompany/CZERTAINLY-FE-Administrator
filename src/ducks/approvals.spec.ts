@@ -23,6 +23,35 @@ describe('approvals slice', () => {
 
         next = reducer({ ...next, isFetchingDetail: true }, actions.getApprovalFailure({ error: 'err' }));
         expect(next.approvalDetails).toBeUndefined();
+        expect(next.isFetchingDetail).toBe(false);
+    });
+
+    test('getApproval keeps the loaded approval while the same approval is refetched', () => {
+        const loaded = { ...initialState, approvalDetails: { approvalUuid: 'a1' } as any };
+
+        const next = reducer(loaded, actions.getApproval({ uuid: 'a1' }));
+        expect(next.isFetchingDetail).toBe(true);
+        expect(next.approvalDetails).toEqual({ approvalUuid: 'a1' });
+    });
+
+    test('getApproval clears the loaded approval when a different approval is requested', () => {
+        const loaded = { ...initialState, approvalDetails: { approvalUuid: 'a1' } as any };
+
+        const next = reducer(loaded, actions.getApproval({ uuid: 'a2' }));
+        expect(next.isFetchingDetail).toBe(true);
+        expect(next.approvalDetails).toBeUndefined();
+    });
+
+    test('a failed detail refresh after a recipient decision stops the detail loading', () => {
+        const loaded = { ...initialState, approvalDetails: { approvalUuid: 'a1' } as any };
+
+        let next = reducer(loaded, actions.approveApprovalRecipient({ uuid: 'a1', userApproval: { comment: 'ok' } }));
+        next = reducer(next, actions.approveApprovalRecipientSuccess({ uuid: 'a1' }));
+        next = reducer(next, actions.getApproval({ uuid: 'a1' }));
+        expect(next.isFetchingDetail).toBe(true);
+
+        next = reducer(next, actions.getApprovalFailure({ error: 'err' }));
+        expect(next.isFetchingDetail).toBe(false);
     });
 
     test('listApprovals / success / failure', () => {

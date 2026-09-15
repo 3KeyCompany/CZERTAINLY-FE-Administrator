@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { Provider } from 'react-redux';
 import { createMockStore } from 'utils/test-helpers';
-import { actions } from 'ducks/approvals';
+import approvalsReducer, { actions, initialState as approvalsInitialState } from 'ducks/approvals';
 import ApprovalDetails from './index';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -107,13 +107,21 @@ describe('ApprovalDetails approvers', () => {
     });
 
     it('keeps the loaded approval on screen while the same approval is refetched', async () => {
-        await render(buildStore({ approvalDetails: approval, isFetchingDetail: true }));
+        const refetching = approvalsReducer(
+            { ...approvalsInitialState, approvalDetails: approval as never },
+            actions.getApproval({ uuid: 'ap1' }),
+        );
+        await render(createMockStore({ approvals: refetching as never }));
 
         expect(container.textContent).toContain('Checked the subject and SANs');
     });
 
     it('shows the skeleton while a different approval is loading', async () => {
-        await render(buildStore({ approvalDetails: { ...approval, approvalUuid: 'other' }, isFetchingDetail: true }));
+        const switching = approvalsReducer(
+            { ...approvalsInitialState, approvalDetails: { ...approval, approvalUuid: 'other' } as never },
+            actions.getApproval({ uuid: 'ap1' }),
+        );
+        await render(createMockStore({ approvals: switching as never }));
 
         expect(container.textContent).not.toContain('Approvers');
     });

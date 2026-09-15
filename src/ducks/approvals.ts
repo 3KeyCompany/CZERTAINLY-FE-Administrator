@@ -41,7 +41,9 @@ export const slice = createSlice({
         },
 
         getApproval: (state, action: PayloadAction<{ uuid: string }>) => {
-            state.approvalDetails = undefined;
+            if (state.approvalDetails?.approvalUuid !== action.payload.uuid) {
+                state.approvalDetails = undefined;
+            }
             state.isFetchingDetail = true;
         },
 
@@ -52,6 +54,7 @@ export const slice = createSlice({
 
         getApprovalFailure: (state, action: PayloadAction<{ error: string | undefined }>) => {
             state.approvalDetails = undefined;
+            state.isFetchingDetail = false;
         },
 
         listApprovals: (state, action: PayloadAction<{ itemsPerPage: number; pageNumber: number }>) => {
