@@ -201,8 +201,14 @@ export const readLogoFile = async (file: File): Promise<LogoReadResult> => {
     return ratioError ? { error: ratioError } : { dataUri };
 };
 
-/** Matches the `max-age` Core serves the anonymous branding response with. */
-export const BRANDING_CACHE_MAX_AGE_MS = 60_000;
+/**
+ * How long after a local branding change an anonymous read bypasses the browser cache.
+ *
+ * Deliberately longer than the `max-age` Core serves that response with rather than equal to it: the two live in
+ * different repositories with nothing tying them together, so matching exactly would silently stop working the day
+ * Core raises its own value. Over-covering costs one administrator a few uncached reads.
+ */
+export const BRANDING_CACHE_BYPASS_WINDOW_MS = 10 * 60_000;
 
 const BRANDING_CHANGED_STORAGE_KEY = 'branding-changed-at';
 
@@ -234,7 +240,7 @@ export const shouldBypassBrandingCache = (now: number = Date.now()): boolean => 
 
         const changedAt = Number(stored);
 
-        if (!Number.isFinite(changedAt) || now - changedAt > BRANDING_CACHE_MAX_AGE_MS) {
+        if (!Number.isFinite(changedAt) || now - changedAt > BRANDING_CACHE_BYPASS_WINDOW_MS) {
             globalThis.localStorage?.removeItem(BRANDING_CHANGED_STORAGE_KEY);
             return false;
         }

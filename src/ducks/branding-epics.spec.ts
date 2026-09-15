@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { firstValueFrom, lastValueFrom, type Observable, of, throwError } from 'rxjs';
 import { AjaxError } from 'rxjs/ajax';
 import { delay, take, toArray } from 'rxjs/operators';
@@ -64,6 +64,10 @@ async function runAll(epic: EpicUnderTest, action: unknown, deps: unknown) {
 }
 
 describe('branding epics', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
     test('getBranding emits the branding it read', async () => {
         const branding = { primaryColor: '#0073CF' };
         const deps = createDeps({ getBrandingSettings: () => of(branding) });
@@ -222,8 +226,6 @@ describe('branding epics', () => {
         await runAll(epics[WRITE_BRANDING], slice.actions.updateBranding({ branding: {} }), deps);
 
         expect(marked).toHaveLength(1);
-
-        vi.restoreAllMocks();
     });
 
     /** Reset is one empty update rather than a field-by-field clear, so the body sent has to actually be empty. */

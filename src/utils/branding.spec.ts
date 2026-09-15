@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
     BRAND_COLOR_PATTERN,
-    BRANDING_CACHE_MAX_AGE_MS,
+    BRANDING_CACHE_BYPASS_WINDOW_MS,
     dataUriMediaType,
     isBrandColor,
     markBrandingChanged,
@@ -347,7 +347,7 @@ describe('branding', () => {
             markBrandingChanged(1_000_000);
 
             expect(store.get(KEY)).toBe('1000000');
-            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_MAX_AGE_MS)).toBe(true);
+            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_BYPASS_WINDOW_MS)).toBe(true);
 
             vi.unstubAllGlobals();
         });
@@ -357,7 +357,7 @@ describe('branding', () => {
             const store = withStorage(new Map());
             markBrandingChanged(1_000_000);
 
-            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_MAX_AGE_MS + 1)).toBe(false);
+            expect(shouldBypassBrandingCache(1_000_000 + BRANDING_CACHE_BYPASS_WINDOW_MS + 1)).toBe(false);
             expect(store.has(KEY)).toBe(false);
 
             vi.unstubAllGlobals();
